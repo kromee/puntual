@@ -10,7 +10,11 @@ local.properties
 /.idea/workspace.xml
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
+/.idea/AndroidProjectSystem.xml
+/.idea/runConfigurations.xml
+/.idea/vcs.xml
 .DS_Store
+*.rar
 /build
 /captures
 .externalNativeBuild

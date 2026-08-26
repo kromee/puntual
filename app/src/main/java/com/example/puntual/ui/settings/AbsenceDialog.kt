@@ -1,15 +1,17 @@
 package com.example.puntual.ui.settings
 
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -23,32 +25,44 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.example.puntual.R
+import com.example.puntual.domain.model.AbsenceType
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ClosePeriodDialog(
+fun AbsenceDialog(
+    startDate: LocalDate,
     endDate: LocalDate,
-    newStartDate: LocalDate,
-    newTitle: String,
+    type: AbsenceType,
+    reason: String,
     errorMessage: String?,
     isLoading: Boolean,
+    onStartDateSelected: (LocalDate) -> Unit,
     onEndDateSelected: (LocalDate) -> Unit,
-    onNewStartDateSelected: (LocalDate) -> Unit,
-    onNewTitleChange: (String) -> Unit,
+    onTypeSelected: (AbsenceType) -> Unit,
+    onReasonChange: (String) -> Unit,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    var showEndPicker by remember { mutableStateOf(false) }
     var showStartPicker by remember { mutableStateOf(false) }
+    var showEndPicker by remember { mutableStateOf(false) }
+    var showTypeMenu by remember { mutableStateOf(false) }
 
+    if (showStartPicker) {
+        AbsenceDatePickerDialog(
+            initialDate = startDate,
+            onDismiss = { showStartPicker = false },
+            onConfirm = { date ->
+                onStartDateSelected(date)
+                showStartPicker = false
+            },
+        )
+    }
     if (showEndPicker) {
-        SingleDatePickerDialog(
+        AbsenceDatePickerDialog(
             initialDate = endDate,
             onDismiss = { showEndPicker = false },
             onConfirm = { date ->
@@ -57,24 +71,14 @@ fun ClosePeriodDialog(
             },
         )
     }
-    if (showStartPicker) {
-        SingleDatePickerDialog(
-            initialDate = newStartDate,
-            onDismiss = { showStartPicker = false },
-            onConfirm = { date ->
-                onNewStartDateSelected(date)
-                showStartPicker = false
-            },
-        )
-    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.settings_close_period_title)) },
+        title = { Text("Registrar ausencia") },
         text = {
             Column(
                 modifier = Modifier
-                    .heightIn(max = 400.dp)
+                    .heightIn(max = 440.dp)
                     .verticalScroll(rememberScrollState()),
             ) {
                 if (errorMessage != null) {
@@ -85,19 +89,31 @@ fun ClosePeriodDialog(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                 }
-                Text(stringResource(R.string.settings_close_period_hint))
+                Text(
+                    text = "Marca días sin check-in para que aparezcan como justificados en el historial.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedButton(
-                    onClick = { showEndPicker = true },
+                    onClick = { showTypeMenu = true },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isLoading,
                 ) {
-                    Text(
-                        stringResource(
-                            R.string.settings_close_period_end,
-                            formatDate(endDate),
-                        ),
-                    )
+                    Text(type.label)
+                }
+                DropdownMenu(
+                    expanded = showTypeMenu,
+                    onDismissRequest = { showTypeMenu = false },
+                ) {
+                    AbsenceType.values().forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(option.label) },
+                            onClick = {
+                                onTypeSelected(option)
+                                showTypeMenu = false
+                            },
+                        )
+                    }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedButton(
@@ -105,44 +121,35 @@ fun ClosePeriodDialog(
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isLoading,
                 ) {
-                    Text(
-                        stringResource(
-                            R.string.settings_close_period_new_start,
-                            formatDate(newStartDate),
-                        ),
-                    )
+                    Text("Inicio: ${formatAbsenceDate(startDate)}")
                 }
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = stringResource(R.string.settings_close_period_dates_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                OutlinedButton(
+                    onClick = { showEndPicker = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isLoading,
+                ) {
+                    Text("Fin: ${formatAbsenceDate(endDate)}")
+                }
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(
-                    value = newTitle,
-                    onValueChange = onNewTitleChange,
-                    label = { Text(stringResource(R.string.settings_close_period_new_title)) },
+                    value = reason,
+                    onValueChange = onReasonChange,
+                    label = { Text("Motivo / comentario") },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
                     enabled = !isLoading,
+                    maxLines = 3,
                 )
             }
         },
         confirmButton = {
             TextButton(enabled = !isLoading, onClick = onConfirm) {
-                Text(
-                    if (isLoading) {
-                        stringResource(R.string.settings_close_period_working)
-                    } else {
-                        stringResource(R.string.settings_close_period_confirm)
-                    },
-                )
+                Text(if (isLoading) "Guardando..." else "Guardar")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss, enabled = !isLoading) {
-                Text(stringResource(android.R.string.cancel))
+                Text("Cancelar")
             }
         },
     )
@@ -150,7 +157,7 @@ fun ClosePeriodDialog(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SingleDatePickerDialog(
+private fun AbsenceDatePickerDialog(
     initialDate: LocalDate,
     onDismiss: () -> Unit,
     onConfirm: (LocalDate) -> Unit,
@@ -172,12 +179,12 @@ private fun SingleDatePickerDialog(
                     onConfirm(date)
                 },
             ) {
-                Text(stringResource(android.R.string.ok))
+                Text("Aceptar")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(android.R.string.cancel))
+                Text("Cancelar")
             }
         },
     ) {
@@ -185,5 +192,5 @@ private fun SingleDatePickerDialog(
     }
 }
 
-private fun formatDate(date: LocalDate): String =
+private fun formatAbsenceDate(date: LocalDate): String =
     "${date.dayOfMonth}/${date.monthValue}/${date.year}"
