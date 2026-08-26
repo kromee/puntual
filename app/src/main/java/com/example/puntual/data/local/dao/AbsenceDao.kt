@@ -30,6 +30,17 @@ interface AbsenceDao {
     )
     fun observeForPeriod(periodId: Long): Flow<List<AbsenceEntity>>
 
+    @Query(
+        """
+        SELECT COUNT(*) FROM absences
+        WHERE periodId = :periodId
+        AND startDate <= :endDate
+        AND endDate >= :startDate
+        AND status NOT IN ('REJECTED', 'CANCELLED')
+        """,
+    )
+    suspend fun countOverlapping(periodId: Long, startDate: String, endDate: String): Int
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(absence: AbsenceEntity): Long
 

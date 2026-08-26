@@ -335,6 +335,8 @@ class SettingsViewModel @Inject constructor(
                             "La fecha final no puede ser anterior a la inicial."
                         SaveAbsenceError.OUTSIDE_ACTIVE_PERIOD ->
                             "La ausencia debe quedar dentro del bloque activo."
+                        SaveAbsenceError.OVERLAPS_EXISTING_ABSENCE ->
+                            "Ya existe una ausencia registrada para una o más fechas de ese rango."
                     }
                     _uiState.update {
                         it.copy(isSavingAbsence = false, absenceError = message)

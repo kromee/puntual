@@ -48,6 +48,14 @@ class AbsenceRepositoryImpl @Inject constructor(
         if (!active.contains(startDate) || !active.contains(endDate)) {
             return SaveAbsenceResult.Error(SaveAbsenceError.OUTSIDE_ACTIVE_PERIOD)
         }
+        val overlappingCount = absenceDao.countOverlapping(
+            periodId = active.id,
+            startDate = startDate.toString(),
+            endDate = endDate.toString(),
+        )
+        if (overlappingCount > 0) {
+            return SaveAbsenceResult.Error(SaveAbsenceError.OVERLAPS_EXISTING_ABSENCE)
+        }
         val absence = Absence(
             periodId = active.id,
             startDate = startDate,
