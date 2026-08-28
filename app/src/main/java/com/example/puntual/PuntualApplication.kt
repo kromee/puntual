@@ -1,7 +1,6 @@
 package com.example.puntual
 
 import android.app.Application
-import com.example.puntual.data.local.SampleDataSeeder
 import com.example.puntual.domain.repository.PeriodRepository
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
@@ -14,9 +13,6 @@ import kotlinx.coroutines.launch
 class PuntualApplication : Application() {
 
     @Inject
-    lateinit var sampleDataSeeder: SampleDataSeeder
-
-    @Inject
     lateinit var periodRepository: PeriodRepository
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -25,7 +21,6 @@ class PuntualApplication : Application() {
         super.onCreate()
         applicationScope.launch {
             periodRepository.ensureDefaultPeriodExists()
-            sampleDataSeeder.seedIfEmpty()
         }
     }
 }
