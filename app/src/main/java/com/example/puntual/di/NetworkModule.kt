@@ -3,8 +3,10 @@ package com.example.puntual.di
 import com.example.puntual.BuildConfig
 import com.example.puntual.data.remote.ZenQuotesApi
 import com.example.puntual.data.remote.supabase.PuntuallSupabaseApi
+import com.example.puntual.data.remote.supabase.SupabaseAuthHeadersInterceptor
 import com.example.puntual.data.remote.supabase.SupabaseConfig
 import com.example.puntual.data.remote.supabase.SupabaseHeadersInterceptor
+import com.example.puntual.data.remote.supabase.auth.SupabaseAuthApi
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import dagger.Module
@@ -60,6 +62,16 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    @Named("supabaseAuth")
+    fun provideSupabaseAuthOkHttpClient(
+        headersInterceptor: SupabaseAuthHeadersInterceptor,
+    ): OkHttpClient =
+        OkHttpClient.Builder()
+            .addInterceptor(headersInterceptor)
+            .build()
+
+    @Provides
+    @Singleton
     @Named("supabase")
     fun provideSupabaseRetrofit(
         gson: Gson,
@@ -74,8 +86,29 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    @Named("supabaseAuth")
+    fun provideSupabaseAuthRetrofit(
+        gson: Gson,
+        @Named("supabaseAuth") client: OkHttpClient,
+        config: SupabaseConfig,
+    ): Retrofit =
+        Retrofit.Builder()
+            .baseUrl(config.authBaseUrl)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create(gson))
+            .build()
+
+    @Provides
+    @Singleton
     fun providePuntuallSupabaseApi(
         @Named("supabase") retrofit: Retrofit,
     ): PuntuallSupabaseApi =
         retrofit.create(PuntuallSupabaseApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideSupabaseAuthApi(
+        @Named("supabaseAuth") retrofit: Retrofit,
+    ): SupabaseAuthApi =
+        retrofit.create(SupabaseAuthApi::class.java)
 }

@@ -2,9 +2,11 @@ package com.example.puntual.di
 
 import com.example.puntual.data.repository.CheckInRepositoryImpl
 import com.example.puntual.data.repository.AbsenceRepositoryImpl
+import com.example.puntual.data.repository.AuthRepositoryImpl
 import com.example.puntual.data.repository.PeriodRepositoryImpl
 import com.example.puntual.data.repository.QuoteRepositoryImpl
 import com.example.puntual.domain.repository.AbsenceRepository
+import com.example.puntual.domain.repository.AuthRepository
 import com.example.puntual.domain.repository.CheckInRepository
 import com.example.puntual.domain.repository.PeriodRepository
 import com.example.puntual.domain.repository.QuoteRepository
@@ -29,6 +31,12 @@ abstract class RepositoryModule {
     abstract fun bindAbsenceRepository(
         impl: AbsenceRepositoryImpl,
     ): AbsenceRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAuthRepository(
+        impl: AuthRepositoryImpl,
+    ): AuthRepository
 
     @Binds
     @Singleton

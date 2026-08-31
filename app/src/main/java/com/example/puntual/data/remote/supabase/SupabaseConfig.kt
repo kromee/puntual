@@ -9,4 +9,7 @@ data class SupabaseConfig(
 
     val restBaseUrl: String
         get() = url.trimEnd('/') + "/rest/v1/"
+
+    val authBaseUrl: String
+        get() = url.trimEnd('/') + "/auth/v1/"
 }
