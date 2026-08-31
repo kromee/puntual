@@ -13,6 +13,7 @@ import com.example.puntual.ui.settings.SettingsScreen
 fun PuntualNavHost(
     navController: NavHostController,
     modifier: Modifier = Modifier,
+    onSignOut: () -> Unit,
 ) {
     NavHost(
         navController = navController,
@@ -26,7 +27,7 @@ fun PuntualNavHost(
             HistoryScreen()
         }
         composable(PuntualRoute.Settings.route) {
-            SettingsScreen()
+            SettingsScreen(onSignOut = onSignOut)
         }
     }
 }

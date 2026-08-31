@@ -44,6 +44,7 @@ import com.example.puntual.ui.theme.TextSecondary
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
+    onSignOut: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -281,6 +282,14 @@ fun SettingsScreen(
                         },
                     )
                 }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            OutlinedButton(
+                onClick = onSignOut,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Cerrar sesión")
             }
         }
     }
