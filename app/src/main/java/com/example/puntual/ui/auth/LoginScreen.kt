@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -69,6 +70,7 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 enabled = !uiState.isLoading,
+                colors = loginTextFieldColors(),
             )
             Spacer(modifier = Modifier.height(12.dp))
             OutlinedTextField(
@@ -79,6 +81,7 @@ fun LoginScreen(
                 singleLine = true,
                 enabled = !uiState.isLoading,
                 visualTransformation = PasswordVisualTransformation(),
+                colors = loginTextFieldColors(),
             )
             val error = uiState.errorMessage
             if (error != null) {
@@ -100,3 +103,17 @@ fun LoginScreen(
         }
     }
 }
+
+@Composable
+private fun loginTextFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedTextColor = TextPrimary,
+    unfocusedTextColor = TextPrimary,
+    disabledTextColor = TextSecondary,
+    focusedLabelColor = PuntualGreen,
+    unfocusedLabelColor = TextSecondary,
+    disabledLabelColor = TextSecondary,
+    focusedBorderColor = PuntualGreen,
+    unfocusedBorderColor = TextSecondary,
+    disabledBorderColor = TextSecondary.copy(alpha = 0.5f),
+    cursorColor = PuntualGreen,
+)
