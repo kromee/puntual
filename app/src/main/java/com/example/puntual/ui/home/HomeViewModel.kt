@@ -101,15 +101,22 @@ class HomeViewModel @Inject constructor(
 
     fun openEditTimePicker() {
         viewModelScope.launch {
-            val period = periodRepository.observeActivePeriod().first() ?: return@launch
-            val today = repository.observeTodayCheckIn(period.id).first() ?: return@launch
-            val time = today.checkedInAt.atZone(ZoneId.systemDefault()).toLocalTime()
-            updateReady {
-                it.copy(
-                    showEditTimePicker = true,
-                    editTimeHour = time.hour,
-                    editTimeMinute = time.minute,
-                )
+            runCatching {
+                val period = periodRepository.observeActivePeriod().first() ?: return@launch
+                val today = repository.observeTodayCheckIn(period.id).first() ?: return@launch
+                val time = today.checkedInAt.atZone(ZoneId.systemDefault()).toLocalTime()
+                updateReady {
+                    it.copy(
+                        showEditTimePicker = true,
+                        editTimeHour = time.hour,
+                        editTimeMinute = time.minute,
+                        errorMessage = null,
+                    )
+                }
+            }.onFailure {
+                updateReady { state ->
+                    state.copy(errorMessage = "No se pudo cargar la hora registrada.")
+                }
             }
         }
     }
@@ -120,9 +127,18 @@ class HomeViewModel @Inject constructor(
 
     fun onEditTimeSelected(hour: Int, minute: Int) {
         viewModelScope.launch {
-            val period = periodRepository.observeActivePeriod().first() ?: return@launch
-            repository.updateCheckInTime(LocalDate.now(), period.id, hour, minute)
-            updateReady { it.copy(showEditTimePicker = false) }
+            updateReady { it.copy(showEditTimePicker = false, errorMessage = null) }
+            val result = runCatching {
+                val period = periodRepository.observeActivePeriod().first() ?: return@runCatching false
+                repository.updateCheckInTime(LocalDate.now(), period.id, hour, minute)
+            }
+            result.onSuccess { updated ->
+                if (!updated) {
+                    updateReady { it.copy(errorMessage = "No se pudo actualizar la hora.") }
+                }
+            }.onFailure {
+                updateReady { it.copy(errorMessage = "La hora se guardó, pero no se pudo refrescar la pantalla.") }
+            }
         }
     }
 

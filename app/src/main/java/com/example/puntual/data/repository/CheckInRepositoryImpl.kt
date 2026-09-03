@@ -47,11 +47,13 @@ class CheckInRepositoryImpl @Inject constructor(
     override fun observeTodayCheckIn(periodId: Long): Flow<CheckIn?> =
         sessionFlow().map { session ->
             session?.let {
-                api.getCheckInByDate(
-                    userId = "eq.${it.userId}",
-                    periodId = "eq.$periodId",
-                    workDate = "eq.${LocalDate.now()}",
-                ).firstOrNull()?.toDomain()
+                runCatching {
+                    api.getCheckInByDate(
+                        userId = "eq.${it.userId}",
+                        periodId = "eq.$periodId",
+                        workDate = "eq.${LocalDate.now()}",
+                    ).firstOrNull()?.toDomain()
+                }.getOrNull()
             }
         }
 
@@ -157,17 +159,19 @@ class CheckInRepositoryImpl @Inject constructor(
             updatedAt,
             existing.expectedTime,
         )
-        api.updateCheckIn(
-            userId = "eq.${session.userId}",
-            periodId = "eq.$periodId",
-            workDate = "eq.$workDate",
-            checkIn = SupabaseCheckInPatchDto(
-                checkedInAt = updatedAt.toInstant().toString(),
-                delayMinutes = delayMinutes,
-            ),
-        )
-        refreshEvents.emit(Unit)
-        return true
+        return runCatching {
+            api.updateCheckIn(
+                userId = "eq.${session.userId}",
+                periodId = "eq.$periodId",
+                workDate = "eq.$workDate",
+                checkIn = SupabaseCheckInPatchDto(
+                    checkedInAt = updatedAt.toInstant().toString(),
+                    delayMinutes = delayMinutes,
+                ),
+            )
+            refreshEvents.emit(Unit)
+            true
+        }.getOrDefault(false)
     }
 
     override suspend fun setDisplayName(name: String) {
