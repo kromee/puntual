@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import retrofit2.HttpException
 
 @Singleton
 class PeriodRepositoryImpl @Inject constructor(
@@ -32,28 +33,32 @@ class PeriodRepositoryImpl @Inject constructor(
 
     override fun observeAllPeriods(): Flow<List<AttendancePeriod>> =
         sessionFlow().map { session ->
-            session?.let { loadPeriods(it) } ?: emptyList()
+            session?.let { authenticatedOrDefault(emptyList()) { loadPeriods(it) } } ?: emptyList()
         }
 
     override fun observeActivePeriod(): Flow<AttendancePeriod?> =
         sessionFlow().map { session ->
-            session?.let { ensureDefaultPeriodExists(it) }
+            session?.let { authenticatedOrDefault(null) { ensureDefaultPeriodExists(it) } }
         }
 
     override fun observePeriod(periodId: Long): Flow<AttendancePeriod?> =
         sessionFlow().map { session ->
             session?.let {
-                api.getPeriodById(
-                    id = "eq.$periodId",
-                    userId = "eq.${it.userId}",
-                ).firstOrNull()?.toDomain()
+                authenticatedOrDefault(null) {
+                    api.getPeriodById(
+                        id = "eq.$periodId",
+                        userId = "eq.${it.userId}",
+                    ).firstOrNull()?.toDomain()
+                }
             }
         }
 
     override suspend fun ensureDefaultPeriodExists() {
         val session = sessionDataStore.sessionFlow.first() ?: return
-        ensureDefaultPeriodExists(session)
-        refreshEvents.emit(Unit)
+        authenticatedOrDefault(Unit) {
+            ensureDefaultPeriodExists(session)
+            refreshEvents.emit(Unit)
+        }
     }
 
     override suspend fun closeActivePeriod(
@@ -121,7 +126,20 @@ class PeriodRepositoryImpl @Inject constructor(
         return api.getPeriods(userId = "eq.${session.userId}").map { it.toDomain() }
     }
 
+    private suspend fun <T> authenticatedOrDefault(defaultValue: T, block: suspend () -> T): T =
+        try {
+            block()
+        } catch (error: HttpException) {
+            if (error.code() == HTTP_UNAUTHORIZED) {
+                sessionDataStore.clearSession()
+            }
+            defaultValue
+        } catch (_: Exception) {
+            defaultValue
+        }
+
     private companion object {
+        const val HTTP_UNAUTHORIZED = 401
         val DEFAULT_START_DATE: LocalDate = LocalDate.of(HistoryPeriodRules.FIRST_HISTORY_YEAR, 1, 1)
     }
 }
