@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -85,7 +86,7 @@ class HistoryViewModel @Inject constructor(
             }
                 .flatMapLatest { (periodId, yearMonth) ->
                     if (periodId == null) {
-                        return@flatMapLatest flowOf(HistoryUiState())
+                        return@flatMapLatest flowOf(HistoryUiState(isLoading = false))
                     }
                     combine(
                         combine(
@@ -120,13 +121,14 @@ class HistoryViewModel @Inject constructor(
                     }
                 }
                 .collect { state ->
-                    _uiState.value = state
+                    _uiState.value = state.copy(isLoading = false)
                 }
         }
     }
 
     fun onPeriodSelected(periodId: Long) {
         if (selectedPeriodId.value == periodId) return
+        _uiState.update { it.copy(isLoading = true) }
         selectedPeriodId.value = periodId
         viewModelScope.launch {
             val period = periodRepository.observePeriod(periodId).first() ?: return@launch
@@ -146,6 +148,7 @@ class HistoryViewModel @Inject constructor(
 
     fun onYearSelected(year: Int) {
         val periodId = selectedPeriodId.value ?: return
+        _uiState.update { it.copy(isLoading = true) }
         viewModelScope.launch {
             val period = periodRepository.observePeriod(periodId).first() ?: return@launch
             val now = YearMonth.now()
@@ -161,6 +164,7 @@ class HistoryViewModel @Inject constructor(
 
     fun onPreviousMonth() {
         val periodId = selectedPeriodId.value ?: return
+        _uiState.update { it.copy(isLoading = true) }
         viewModelScope.launch {
             val period = periodRepository.observePeriod(periodId).first() ?: return@launch
             val current = selectedYearMonth.value
@@ -172,6 +176,7 @@ class HistoryViewModel @Inject constructor(
 
     fun onNextMonth() {
         val periodId = selectedPeriodId.value ?: return
+        _uiState.update { it.copy(isLoading = true) }
         viewModelScope.launch {
             val period = periodRepository.observePeriod(periodId).first() ?: return@launch
             val current = selectedYearMonth.value

@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -55,9 +56,12 @@ fun HistoryScreen(
         userDisplayName = uiState.userName,
         screenTitle = stringResource(R.string.nav_history),
     ) {
-        Column(
-            modifier = Modifier.verticalScroll(rememberScrollState()),
-        ) {
+        if (uiState.isLoading) {
+            HistoryLoadingCard()
+        } else {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+            ) {
             if (uiState.periods.size > 1) {
                 PeriodFilterDropdown(
                     periods = uiState.periods,
@@ -148,6 +152,27 @@ fun HistoryScreen(
                     DurationSummaryDisplay(summary = uiState.monthSummary)
                 }
             }
+        }
+    }
+}
+}
+
+@Composable
+private fun HistoryLoadingCard() {
+    PuntualElevatedCard {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            CircularProgressIndicator(color = PuntualGreen)
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Cargando historial...",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondary,
+            )
         }
     }
 }

@@ -36,6 +36,7 @@ data class MonthBreakdownRowUi(
 )
 
 data class HistoryUiState(
+    val isLoading: Boolean = true,
     val userName: String = "",
     val selectedYearMonth: YearMonth = YearMonth.now(),
     val availableYears: List<Int> = emptyList(),
