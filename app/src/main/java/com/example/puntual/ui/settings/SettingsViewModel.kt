@@ -76,9 +76,6 @@ data class SettingsUiState(
     val absenceError: String? = null,
     val isSavingAbsence: Boolean = false,
     val absenceSuccess: String? = null,
-    val showAugustCleanupDialog: Boolean = false,
-    val isCleaningAugustData: Boolean = false,
-    val augustCleanupMessage: String? = null,
 )
 
 sealed interface PermissionUiState {
@@ -352,44 +349,6 @@ class SettingsViewModel @Inject constructor(
     fun deleteAbsence(absenceId: Long) {
         viewModelScope.launch {
             absenceRepository.deleteAbsence(absenceId)
-        }
-    }
-
-    fun openAugustCleanupDialog() {
-        _uiState.update {
-            it.copy(showAugustCleanupDialog = true, augustCleanupMessage = null)
-        }
-    }
-
-    fun dismissAugustCleanupDialog() {
-        _uiState.update { it.copy(showAugustCleanupDialog = false) }
-    }
-
-    fun confirmAugustCleanup() {
-        viewModelScope.launch {
-            val periodId = activePeriodId.value
-            if (periodId == null) {
-                _uiState.update {
-                    it.copy(
-                        showAugustCleanupDialog = false,
-                        augustCleanupMessage = "No hay un periodo activo para limpiar registros.",
-                    )
-                }
-                return@launch
-            }
-            _uiState.update { it.copy(isCleaningAugustData = true) }
-            val deleted = repository.deleteCheckInsBetween(
-                periodId = periodId,
-                startDate = LocalDate.of(2026, 8, 1),
-                endDate = LocalDate.of(2026, 8, 31),
-            )
-            _uiState.update {
-                it.copy(
-                    showAugustCleanupDialog = false,
-                    isCleaningAugustData = false,
-                    augustCleanupMessage = "Registros de agosto eliminados: $deleted.",
-                )
-            }
         }
     }
 

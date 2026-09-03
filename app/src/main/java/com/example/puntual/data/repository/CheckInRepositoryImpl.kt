@@ -1,12 +1,13 @@
 package com.example.puntual.data.repository
 
+import com.example.puntual.data.datastore.AuthSessionDataStore
 import com.example.puntual.data.datastore.UserPreferencesDataStore
-import com.example.puntual.data.local.dao.AbsenceDao
-import com.example.puntual.data.local.dao.AttendancePeriodDao
-import com.example.puntual.data.local.dao.CheckInDao
 import com.example.puntual.data.mapper.toDomain
-import com.example.puntual.data.mapper.toEntity
+import com.example.puntual.data.mapper.toSupabaseInsert
+import com.example.puntual.data.remote.supabase.PuntuallSupabaseApi
+import com.example.puntual.data.remote.supabase.SupabaseCheckInPatchDto
 import com.example.puntual.domain.model.AttendancePeriod
+import com.example.puntual.domain.model.AuthSession
 import com.example.puntual.domain.model.CheckIn
 import com.example.puntual.domain.model.MonthBreakdown
 import com.example.puntual.domain.model.MonthHistory
@@ -23,127 +24,169 @@ import java.time.LocalTime
 import java.time.Year
 import java.time.YearMonth
 import java.time.ZoneId
-import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
-@OptIn(ExperimentalCoroutinesApi::class)
 @Singleton
 class CheckInRepositoryImpl @Inject constructor(
-    private val checkInDao: CheckInDao,
-    private val absenceDao: AbsenceDao,
-    private val periodDao: AttendancePeriodDao,
+    private val api: PuntuallSupabaseApi,
+    private val sessionDataStore: AuthSessionDataStore,
     private val preferencesDataStore: UserPreferencesDataStore,
 ) : CheckInRepository {
+
+    private val refreshEvents = MutableSharedFlow<Unit>(replay = 1).apply { tryEmit(Unit) }
 
     override val userPreferences: Flow<UserPreferences> =
         preferencesDataStore.preferencesFlow
 
-    override fun observeTodayCheckIn(periodId: Long): Flow<CheckIn?> {
-        val today = LocalDate.now().toString()
-        return checkInDao.observeByWorkDate(periodId, today).map { it?.toDomain() }
-    }
+    override fun observeTodayCheckIn(periodId: Long): Flow<CheckIn?> =
+        sessionFlow().map { session ->
+            session?.let {
+                api.getCheckInByDate(
+                    userId = "eq.${it.userId}",
+                    periodId = "eq.$periodId",
+                    workDate = "eq.${LocalDate.now()}",
+                ).firstOrNull()?.toDomain()
+            }
+        }
 
     override fun observeMonthHistory(periodId: Long, yearMonth: YearMonth): Flow<MonthHistory> =
-        periodDao.observeById(periodId).flatMapLatest { entity ->
-            val period = entity?.toDomain()
-            if (period == null) {
-                return@flatMapLatest flowOf(emptyMonthHistory(yearMonth))
-            }
+        sessionFlow().map { session ->
+            val period = session?.let { loadPeriod(it, periodId) }
+                ?: return@map emptyMonthHistory(yearMonth)
             val range = PeriodDateRules.intersectMonth(period, yearMonth)
-                ?: return@flatMapLatest flowOf(emptyMonthHistory(yearMonth))
-            val start = range.start.toString()
-            val end = range.endInclusive.toString()
-            combine(
-                checkInDao.observeBetween(periodId, start, end)
-                    .map { list -> list.map { it.toDomain() }.sortedBy { it.workDate } },
-                absenceDao.observeBetween(periodId, start, end)
-                    .map { list -> list.map { it.toDomain() }.sortedBy { it.startDate } },
-                checkInDao.observeLateDayCount(periodId, start, end),
-                checkInDao.observeTotalDelayMinutes(periodId, start, end),
-            ) { checkIns, absences, lateDays, totalMinutes ->
-                MonthHistory(yearMonth, checkIns, absences, lateDays, totalMinutes)
-            }
+                ?: return@map emptyMonthHistory(yearMonth)
+            val checkIns = loadCheckIns(session, periodId, range.start, range.endInclusive)
+            val absences = api.getAbsencesBetween(
+                userId = "eq.${session.userId}",
+                periodId = "eq.$periodId",
+                startsBeforeEnd = "lte.${range.endInclusive}",
+                endsAfterStart = "gte.${range.start}",
+            ).map { it.toDomain() }.sortedBy { it.startDate }
+            MonthHistory(
+                yearMonth = yearMonth,
+                checkIns = checkIns,
+                absences = absences,
+                lateDaysCount = checkIns.count { it.delayMinutes > 0 },
+                totalDelayMinutes = checkIns.sumOf { it.delayMinutes },
+            )
         }
 
     override fun observeYearSummary(periodId: Long, year: Int): Flow<YearSummary> =
-        periodDao.observeById(periodId).flatMapLatest { entity ->
-            val period = entity?.toDomain()
-            if (period == null) {
-                return@flatMapLatest flowOf(YearSummary(year, 0, 0, 0))
-            }
+        sessionFlow().map { session ->
+            val period = session?.let { loadPeriod(it, periodId) }
+                ?: return@map YearSummary(year, 0, 0, 0)
             val now = YearMonth.now()
             val throughMonth = effectiveThroughMonth(period, year, now)
             val range = PeriodDateRules.intersectYearSlice(period, year, throughMonth)
-                ?: return@flatMapLatest flowOf(YearSummary(year, throughMonth, 0, 0))
-            val start = range.start.toString()
-            val end = range.endInclusive.toString()
-            combine(
-                checkInDao.observeLateDayCount(periodId, start, end),
-                checkInDao.observeTotalDelayMinutes(periodId, start, end),
-            ) { lateDays, totalMinutes ->
-                YearSummary(year, throughMonth, lateDays, totalMinutes)
-            }
+                ?: return@map YearSummary(year, throughMonth, 0, 0)
+            val checkIns = loadCheckIns(session, periodId, range.start, range.endInclusive)
+            YearSummary(
+                year = year,
+                throughMonth = throughMonth,
+                lateDaysCount = checkIns.count { it.delayMinutes > 0 },
+                totalDelayMinutes = checkIns.sumOf { it.delayMinutes },
+            )
         }
 
     override fun observeYearMonthlyBreakdown(periodId: Long, year: Int): Flow<List<MonthBreakdown>> =
-        periodDao.observeById(periodId).flatMapLatest { entity ->
-            val period = entity?.toDomain()
-            if (period == null) return@flatMapLatest flowOf(emptyList())
+        sessionFlow().map { session ->
+            val period = session?.let { loadPeriod(it, periodId) } ?: return@map emptyList()
             val now = YearMonth.now()
             val first = PeriodDateRules.firstSelectableMonth(period, year)
             val last = PeriodDateRules.lastSelectableMonth(period, year, now)
-            if (first.year != year || last.year != year) return@flatMapLatest flowOf(emptyList())
+            if (first.year != year || last.year != year) return@map emptyList()
             val range = PeriodDateRules.intersectYearSlice(period, year, last.monthValue)
-                ?: return@flatMapLatest flowOf(monthsWithZeros(first, last))
-            val start = range.start.toString()
-            val end = range.endInclusive.toString()
-            checkInDao.observeBetween(periodId, start, end).map { entities ->
-                val byMonth = entities
-                    .groupBy { YearMonth.from(LocalDate.parse(it.workDate)) }
-                    .mapValues { (yearMonth, monthEntities) ->
-                        MonthBreakdown(
-                            yearMonth = yearMonth,
-                            lateDaysCount = monthEntities.count { it.delayMinutes > 0 },
-                            totalDelayMinutes = monthEntities.sumOf { it.delayMinutes },
-                        )
-                    }
-                monthsInRange(first, last).map { ym ->
-                    byMonth[ym] ?: MonthBreakdown(ym, 0, 0)
+                ?: return@map monthsWithZeros(first, last)
+            val byMonth = loadCheckIns(session, periodId, range.start, range.endInclusive)
+                .groupBy { YearMonth.from(it.workDate) }
+                .mapValues { (yearMonth, monthCheckIns) ->
+                    MonthBreakdown(
+                        yearMonth = yearMonth,
+                        lateDaysCount = monthCheckIns.count { it.delayMinutes > 0 },
+                        totalDelayMinutes = monthCheckIns.sumOf { it.delayMinutes },
+                    )
                 }
+            monthsInRange(first, last).map { ym ->
+                byMonth[ym] ?: MonthBreakdown(ym, 0, 0)
             }
         }
 
     override suspend fun getAvailableYears(periodId: Long): List<Int> {
-        val period = periodDao.getById(periodId)?.toDomain() ?: return listOf(Year.now().value)
+        val session = sessionDataStore.sessionFlow.first() ?: return listOf(Year.now().value)
+        val period = loadPeriod(session, periodId) ?: return listOf(Year.now().value)
         return PeriodDateRules.availableYears(period)
     }
 
     override suspend fun registerCheckIn(): RegisterCheckInResult {
+        val session = sessionDataStore.sessionFlow.first()
+            ?: return RegisterCheckInResult.Error(RegisterCheckInError.NO_ACTIVE_PERIOD)
         val today = LocalDate.now()
         if (!WorkdayRules.isWorkday(today)) {
             return RegisterCheckInResult.Error(RegisterCheckInError.NOT_WORKDAY)
         }
-        val activeEntity = periodDao.getActive()
+        val active = activePeriod(session)
             ?: return RegisterCheckInResult.Error(RegisterCheckInError.NO_ACTIVE_PERIOD)
-        val active = activeEntity.toDomain()
         if (!active.contains(today)) {
             return RegisterCheckInResult.Error(RegisterCheckInError.OUTSIDE_ACTIVE_PERIOD)
         }
-        if (checkInDao.getByWorkDate(active.id, today.toString()) != null) {
+        if (existingCheckIn(session, active.id, today) != null) {
             return RegisterCheckInResult.Error(RegisterCheckInError.ALREADY_REGISTERED)
         }
         val prefs = preferencesDataStore.preferencesFlow.first()
-        return registerWithPrefs(active.id, today, prefs)
+        return registerWithPrefs(session, active.id, today, prefs)
     }
 
+    override suspend fun updateCheckInTime(
+        workDate: LocalDate,
+        periodId: Long,
+        hour: Int,
+        minute: Int,
+    ): Boolean {
+        val session = sessionDataStore.sessionFlow.first() ?: return false
+        val existing = existingCheckIn(session, periodId, workDate) ?: return false
+        val zone = ZoneId.systemDefault()
+        val updatedAt = workDate.atTime(hour, minute).atZone(zone)
+        val delayMinutes = DelayCalculator.calculateDelayMinutes(
+            workDate,
+            updatedAt,
+            existing.expectedTime,
+        )
+        api.updateCheckIn(
+            userId = "eq.${session.userId}",
+            periodId = "eq.$periodId",
+            workDate = "eq.$workDate",
+            checkIn = SupabaseCheckInPatchDto(
+                checkedInAt = updatedAt.toInstant().toString(),
+                delayMinutes = delayMinutes,
+            ),
+        )
+        refreshEvents.emit(Unit)
+        return true
+    }
+
+    override suspend fun setDisplayName(name: String) {
+        preferencesDataStore.setDisplayName(name)
+    }
+
+    override suspend fun setExpectedTime(hour: Int, minute: Int) {
+        preferencesDataStore.setExpectedTime(hour, minute)
+    }
+
+    override suspend fun clearExpectedTime() {
+        preferencesDataStore.clearExpectedTime()
+    }
+
+    private fun sessionFlow(): Flow<AuthSession?> =
+        combine(sessionDataStore.sessionFlow, refreshEvents) { session, _ -> session }
+
     private suspend fun registerWithPrefs(
+        session: AuthSession,
         periodId: Long,
         today: LocalDate,
         prefs: UserPreferences,
@@ -166,51 +209,43 @@ class CheckInRepositoryImpl @Inject constructor(
             expectedTime = expectedTime,
             delayMinutes = delayMinutes,
         )
-        checkInDao.insert(checkIn.toEntity(periodId))
+        api.createCheckIn(checkIn.toSupabaseInsert(session.userId, periodId))
+        refreshEvents.emit(Unit)
         return RegisterCheckInResult.Success(checkIn)
     }
 
-    override suspend fun updateCheckInTime(
-        workDate: LocalDate,
+    private suspend fun existingCheckIn(
+        session: AuthSession,
         periodId: Long,
-        hour: Int,
-        minute: Int,
-    ): Boolean {
-        val existing = checkInDao.getByWorkDate(periodId, workDate.toString()) ?: return false
-        val zone = ZoneId.systemDefault()
-        val updatedAt = workDate.atTime(hour, minute).atZone(zone)
-        val expectedTime = LocalTime.of(existing.expectedHour, existing.expectedMinute)
-        val delayMinutes = DelayCalculator.calculateDelayMinutes(
-            workDate,
-            updatedAt,
-            expectedTime,
-        )
-        checkInDao.update(
-            existing.copy(
-                checkedInAtEpochMilli = updatedAt.toInstant().toEpochMilli(),
-                delayMinutes = delayMinutes,
-            ),
-        )
-        return true
-    }
+        workDate: LocalDate,
+    ): CheckIn? = api.getCheckInByDate(
+        userId = "eq.${session.userId}",
+        periodId = "eq.$periodId",
+        workDate = "eq.$workDate",
+    ).firstOrNull()?.toDomain()
 
-    override suspend fun deleteCheckInsBetween(
+    private suspend fun activePeriod(session: AuthSession): AttendancePeriod? =
+        api.getActivePeriods(userId = "eq.${session.userId}")
+            .firstOrNull()
+            ?.toDomain()
+
+    private suspend fun loadPeriod(session: AuthSession, periodId: Long): AttendancePeriod? =
+        api.getPeriodById(
+            id = "eq.$periodId",
+            userId = "eq.${session.userId}",
+        ).firstOrNull()?.toDomain()
+
+    private suspend fun loadCheckIns(
+        session: AuthSession,
         periodId: Long,
         startDate: LocalDate,
         endDate: LocalDate,
-    ): Int = checkInDao.deleteBetween(periodId, startDate.toString(), endDate.toString())
-
-    override suspend fun setDisplayName(name: String) {
-        preferencesDataStore.setDisplayName(name)
-    }
-
-    override suspend fun setExpectedTime(hour: Int, minute: Int) {
-        preferencesDataStore.setExpectedTime(hour, minute)
-    }
-
-    override suspend fun clearExpectedTime() {
-        preferencesDataStore.clearExpectedTime()
-    }
+    ): List<CheckIn> = api.getCheckInsBetween(
+        userId = "eq.${session.userId}",
+        periodId = "eq.$periodId",
+        workDateFrom = "gte.$startDate",
+        workDateTo = "lte.$endDate",
+    ).map { it.toDomain() }.sortedBy { it.workDate }
 
     private fun emptyMonthHistory(yearMonth: YearMonth) =
         MonthHistory(yearMonth, emptyList(), emptyList(), 0, 0)

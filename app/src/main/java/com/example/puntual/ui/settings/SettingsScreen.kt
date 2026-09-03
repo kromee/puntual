@@ -203,39 +203,6 @@ fun SettingsScreen(
 
             PuntualElevatedCard {
                 Text(
-                    text = "Mantenimiento",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = TextPrimary,
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Limpia registros de prueba sin afectar otros meses.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary,
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = viewModel::openAugustCleanupDialog,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Eliminar registros de agosto 2026")
-                }
-                val cleanupMessage = uiState.augustCleanupMessage
-                if (cleanupMessage != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = cleanupMessage,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = PuntualGreen,
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            PuntualElevatedCard {
-                Text(
                     text = stringResource(R.string.settings_schedule),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
@@ -368,31 +335,6 @@ fun SettingsScreen(
         )
     }
 
-    if (uiState.showAugustCleanupDialog) {
-        AlertDialog(
-            onDismissRequest = viewModel::dismissAugustCleanupDialog,
-            title = { Text("Eliminar registros de agosto") },
-            text = {
-                Text("Se eliminarán los check-ins del 1 al 31 de agosto de 2026 del periodo activo. Esta acción no afecta julio ni otros meses.")
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = viewModel::confirmAugustCleanup,
-                    enabled = !uiState.isCleaningAugustData,
-                ) {
-                    Text(if (uiState.isCleaningAugustData) "Eliminando..." else "Eliminar")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = viewModel::dismissAugustCleanupDialog,
-                    enabled = !uiState.isCleaningAugustData,
-                ) {
-                    Text(stringResource(android.R.string.cancel))
-                }
-            },
-        )
-    }
 }
 
 @Composable
