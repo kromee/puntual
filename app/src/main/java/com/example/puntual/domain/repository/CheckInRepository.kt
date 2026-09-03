@@ -30,6 +30,7 @@ interface CheckInRepository {
     suspend fun getAvailableYears(periodId: Long): List<Int>
     suspend fun registerCheckIn(): RegisterCheckInResult
     suspend fun updateCheckInTime(workDate: LocalDate, periodId: Long, hour: Int, minute: Int): Boolean
+    suspend fun deleteCheckInsBetween(periodId: Long, startDate: LocalDate, endDate: LocalDate): Int
     suspend fun setDisplayName(name: String)
     suspend fun setExpectedTime(hour: Int, minute: Int)
     suspend fun clearExpectedTime()

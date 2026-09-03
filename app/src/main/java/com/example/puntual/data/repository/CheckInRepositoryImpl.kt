@@ -194,6 +194,12 @@ class CheckInRepositoryImpl @Inject constructor(
         return true
     }
 
+    override suspend fun deleteCheckInsBetween(
+        periodId: Long,
+        startDate: LocalDate,
+        endDate: LocalDate,
+    ): Int = checkInDao.deleteBetween(periodId, startDate.toString(), endDate.toString())
+
     override suspend fun setDisplayName(name: String) {
         preferencesDataStore.setDisplayName(name)
     }

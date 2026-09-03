@@ -70,4 +70,12 @@ interface CheckInDao {
 
     @Update
     suspend fun update(checkIn: CheckInEntity)
+
+    @Query(
+        """
+        DELETE FROM check_ins
+        WHERE periodId = :periodId AND workDate BETWEEN :startDate AND :endDate
+        """,
+    )
+    suspend fun deleteBetween(periodId: Long, startDate: String, endDate: String): Int
 }
