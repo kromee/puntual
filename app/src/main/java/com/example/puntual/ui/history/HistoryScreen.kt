@@ -55,7 +55,7 @@ import com.example.puntual.ui.theme.TextSecondary
 import com.example.puntual.ui.theme.TextPrimary
 import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
+import java.time.ZoneOffset
 
 @Composable
 fun HistoryScreen(
@@ -299,7 +299,7 @@ private fun ManualCheckInDatePickerDialog(
     onConfirm: (LocalDate) -> Unit,
 ) {
     val initialMillis = initialDate
-        .atStartOfDay(ZoneId.systemDefault())
+        .atStartOfDay(ZoneOffset.UTC)
         .toInstant()
         .toEpochMilli()
     val state = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
@@ -310,7 +310,7 @@ private fun ManualCheckInDatePickerDialog(
                 onClick = {
                     val millis = state.selectedDateMillis ?: return@TextButton
                     val selected = Instant.ofEpochMilli(millis)
-                        .atZone(ZoneId.systemDefault())
+                        .atZone(ZoneOffset.UTC)
                         .toLocalDate()
                     onConfirm(selected)
                 },

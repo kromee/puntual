@@ -230,7 +230,13 @@ class HistoryViewModel @Inject constructor(
     }
 
     fun confirmManualCheckIn(hour: Int, minute: Int) {
-        val periodId = selectedPeriodId.value ?: return
+        val periodId = selectedPeriodId.value
+        if (periodId == null) {
+            _uiState.update {
+                it.copy(manualCheckInError = "No hay periodo seleccionado para guardar.")
+            }
+            return
+        }
         viewModelScope.launch {
             val state = _uiState.value
             _uiState.update {
@@ -241,32 +247,42 @@ class HistoryViewModel @Inject constructor(
                     manualCheckInError = null,
                 )
             }
-            when (
-                val result = repository.registerManualCheckIn(
+            val result = runCatching {
+                repository.registerManualCheckIn(
                     workDate = state.manualCheckInDate,
                     periodId = periodId,
                     hour = hour,
                     minute = minute,
                 )
-            ) {
-                is RegisterCheckInResult.Success -> {
-                    selectedYearMonth.value = YearMonth.from(state.manualCheckInDate)
-                    _uiState.update {
-                        it.copy(
-                            isLoading = true,
-                            showManualCheckInDialog = false,
-                            isSavingManualCheckIn = false,
-                            manualCheckInSuccess = "Registro agregado correctamente.",
-                        )
+            }
+            result.onSuccess { registerResult ->
+                when (registerResult) {
+                    is RegisterCheckInResult.Success -> {
+                        selectedYearMonth.value = YearMonth.from(state.manualCheckInDate)
+                        _uiState.update {
+                            it.copy(
+                                isLoading = true,
+                                showManualCheckInDialog = false,
+                                isSavingManualCheckIn = false,
+                                manualCheckInSuccess = "Registro agregado correctamente.",
+                            )
+                        }
+                    }
+                    is RegisterCheckInResult.Error -> {
+                        _uiState.update {
+                            it.copy(
+                                isSavingManualCheckIn = false,
+                                manualCheckInError = registerResult.type.toManualCheckInMessage(),
+                            )
+                        }
                     }
                 }
-                is RegisterCheckInResult.Error -> {
-                    _uiState.update {
-                        it.copy(
-                            isSavingManualCheckIn = false,
-                            manualCheckInError = result.type.toManualCheckInMessage(),
-                        )
-                    }
+            }.onFailure {
+                _uiState.update {
+                    it.copy(
+                        isSavingManualCheckIn = false,
+                        manualCheckInError = "No se pudo guardar el registro. Revisa conexión o sesión.",
+                    )
                 }
             }
         }
