@@ -23,7 +23,12 @@ class AuthViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             authRepository.session.collect { session ->
-                _uiState.update { it.copy(isAuthenticated = session != null) }
+                _uiState.update {
+                    it.copy(
+                        isAuthenticated = session != null,
+                        isSessionResolved = true,
+                    )
+                }
             }
         }
     }
@@ -51,6 +56,7 @@ class AuthViewModel @Inject constructor(
                             isLoading = false,
                             password = "",
                             isAuthenticated = true,
+                            isSessionResolved = true,
                         )
                     }
                 }

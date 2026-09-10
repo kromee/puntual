@@ -50,6 +50,7 @@ data class AbsenceListItemUi(
 )
 
 data class SettingsUiState(
+    val isLoading: Boolean = true,
     val displayNameDraft: String = "",
     val isEditingName: Boolean = false,
     val hasExpectedTime: Boolean = false,
@@ -103,6 +104,7 @@ class SettingsViewModel @Inject constructor(
                 activePeriodId.value = active?.id
                 _uiState.update { current ->
                     current.copy(
+                        isLoading = false,
                         periods = periods.map { it.toListItemUi() },
                         activePeriodTitle = active?.title ?: "",
                     )
