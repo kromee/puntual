@@ -5,18 +5,30 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -29,13 +41,50 @@ import com.example.puntual.ui.auth.LoginScreen
 import com.example.puntual.ui.components.PuntualBottomBar
 import com.example.puntual.ui.theme.PuntualGreen
 import com.example.puntual.ui.theme.ScreenBackground
+import com.example.puntual.ui.theme.TextPrimary
 import com.example.puntual.ui.theme.TextSecondary
 
 @Composable
 fun PuntualApp(
+    activity: FragmentActivity,
     authViewModel: AuthViewModel = hiltViewModel(),
 ) {
     val authState by authViewModel.uiState.collectAsStateWithLifecycle()
+    var isLocallyUnlocked by remember { mutableStateOf(false) }
+    var biometricError by remember { mutableStateOf<String?>(null) }
+    val biometricManager = remember(activity) { BiometricManager.from(activity) }
+    val canUseBiometrics = remember(activity) {
+        biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) ==
+            BiometricManager.BIOMETRIC_SUCCESS
+    }
+    val promptInfo = remember {
+        BiometricPrompt.PromptInfo.Builder()
+            .setTitle("Desbloquear Puntuall")
+            .setSubtitle("Confirma tu identidad para entrar")
+            .setNegativeButtonText("Cancelar")
+            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+            .build()
+    }
+    val biometricPrompt = remember(activity) {
+        BiometricPrompt(
+            activity,
+            ContextCompat.getMainExecutor(activity),
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    isLocallyUnlocked = true
+                    biometricError = null
+                }
+
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    biometricError = errString.toString()
+                }
+
+                override fun onAuthenticationFailed() {
+                    biometricError = "No se pudo validar la huella. Intenta de nuevo."
+                }
+            },
+        )
+    }
 
     if (!authState.isSessionResolved) {
         PuntualLaunchLoadingScreen()
@@ -44,6 +93,31 @@ fun PuntualApp(
 
     if (!authState.isAuthenticated) {
         LoginScreen(viewModel = authViewModel)
+        return
+    }
+
+    LaunchedEffect(authState.isAuthenticated) {
+        if (!authState.isAuthenticated) {
+            isLocallyUnlocked = false
+            biometricError = null
+        }
+    }
+
+    LaunchedEffect(authState.isAuthenticated, canUseBiometrics, isLocallyUnlocked) {
+        if (authState.isAuthenticated && canUseBiometrics && !isLocallyUnlocked) {
+            biometricPrompt.authenticate(promptInfo)
+        }
+    }
+
+    if (canUseBiometrics && !isLocallyUnlocked) {
+        BiometricUnlockScreen(
+            errorMessage = biometricError,
+            onUnlockClick = {
+                biometricError = null
+                biometricPrompt.authenticate(promptInfo)
+            },
+            onSignOut = authViewModel::signOut,
+        )
         return
     }
 
@@ -73,6 +147,63 @@ fun PuntualApp(
             modifier = Modifier.padding(innerPadding),
             onSignOut = authViewModel::signOut,
         )
+    }
+}
+
+@Composable
+private fun BiometricUnlockScreen(
+    errorMessage: String?,
+    onUnlockClick: () -> Unit,
+    onSignOut: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ScreenBackground)
+            .padding(horizontal = 24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier.widthIn(max = 360.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = "Puntuall",
+                style = MaterialTheme.typography.headlineMedium,
+                color = PuntualGreen,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Confirma tu identidad para continuar.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = TextSecondary,
+            )
+            if (errorMessage != null) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = errorMessage,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+            OutlinedButton(
+                onClick = onUnlockClick,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = PuntualGreen),
+            ) {
+                Text("Usar huella")
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = onSignOut,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
+            ) {
+                Text("Cerrar sesión")
+            }
+        }
     }
 }
 
