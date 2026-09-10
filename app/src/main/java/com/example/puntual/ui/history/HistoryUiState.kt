@@ -54,4 +54,11 @@ data class HistoryUiState(
     val periods: List<PeriodOptionUi> = emptyList(),
     val selectedPeriodId: Long? = null,
     val periodRangeLabel: String? = null,
+    val showManualCheckInDialog: Boolean = false,
+    val manualCheckInDate: LocalDate = LocalDate.now(),
+    val manualCheckInHour: Int = 9,
+    val manualCheckInMinute: Int = 0,
+    val isSavingManualCheckIn: Boolean = false,
+    val manualCheckInError: String? = null,
+    val manualCheckInSuccess: String? = null,
 )

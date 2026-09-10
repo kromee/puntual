@@ -11,6 +11,8 @@ import com.example.puntual.domain.model.YearSummary
 import com.example.puntual.domain.model.headerUserLine
 import com.example.puntual.domain.repository.CheckInRepository
 import com.example.puntual.domain.repository.PeriodRepository
+import com.example.puntual.domain.repository.RegisterCheckInError
+import com.example.puntual.domain.repository.RegisterCheckInResult
 import com.example.puntual.domain.util.PeriodDateRules
 import com.example.puntual.domain.util.PuntualFormatters
 import com.example.puntual.domain.util.WorkdayRules
@@ -187,6 +189,89 @@ class HistoryViewModel @Inject constructor(
         }
     }
 
+    fun openManualCheckInDialog() {
+        val selected = selectedYearMonth.value
+        val today = LocalDate.now()
+        val initialDate = if (selected.year == today.year && selected.month == today.month) {
+            today
+        } else {
+            selected.atDay(1)
+        }
+        _uiState.update {
+            it.copy(
+                showManualCheckInDialog = true,
+                manualCheckInDate = initialDate,
+                manualCheckInHour = 9,
+                manualCheckInMinute = 0,
+                manualCheckInError = null,
+                manualCheckInSuccess = null,
+            )
+        }
+    }
+
+    fun dismissManualCheckInDialog() {
+        _uiState.update {
+            it.copy(showManualCheckInDialog = false, manualCheckInError = null)
+        }
+    }
+
+    fun onManualCheckInDateSelected(date: LocalDate) {
+        _uiState.update { it.copy(manualCheckInDate = date, manualCheckInError = null) }
+    }
+
+    fun onManualCheckInTimeSelected(hour: Int, minute: Int) {
+        _uiState.update {
+            it.copy(
+                manualCheckInHour = hour,
+                manualCheckInMinute = minute,
+                manualCheckInError = null,
+            )
+        }
+    }
+
+    fun confirmManualCheckIn(hour: Int, minute: Int) {
+        val periodId = selectedPeriodId.value ?: return
+        viewModelScope.launch {
+            val state = _uiState.value
+            _uiState.update {
+                it.copy(
+                    manualCheckInHour = hour,
+                    manualCheckInMinute = minute,
+                    isSavingManualCheckIn = true,
+                    manualCheckInError = null,
+                )
+            }
+            when (
+                val result = repository.registerManualCheckIn(
+                    workDate = state.manualCheckInDate,
+                    periodId = periodId,
+                    hour = hour,
+                    minute = minute,
+                )
+            ) {
+                is RegisterCheckInResult.Success -> {
+                    selectedYearMonth.value = YearMonth.from(state.manualCheckInDate)
+                    _uiState.update {
+                        it.copy(
+                            isLoading = true,
+                            showManualCheckInDialog = false,
+                            isSavingManualCheckIn = false,
+                            manualCheckInSuccess = "Registro agregado correctamente.",
+                        )
+                    }
+                }
+                is RegisterCheckInResult.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isSavingManualCheckIn = false,
+                            manualCheckInError = result.type.toManualCheckInMessage(),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     private fun mapToUi(
         userName: String,
         yearMonth: YearMonth,
@@ -300,4 +385,18 @@ class HistoryViewModel @Inject constructor(
             .filter(WorkdayRules::isWorkday)
             .toList()
     }
+
+    private fun RegisterCheckInError.toManualCheckInMessage(): String =
+        when (this) {
+            RegisterCheckInError.NOT_WORKDAY ->
+                "La fecha seleccionada no es día laborable."
+            RegisterCheckInError.ALREADY_REGISTERED ->
+                "Ya existe un registro para esa fecha."
+            RegisterCheckInError.NO_ACTIVE_PERIOD ->
+                "No hay periodo activo para guardar el registro."
+            RegisterCheckInError.OUTSIDE_ACTIVE_PERIOD ->
+                "La fecha queda fuera del periodo seleccionado."
+            RegisterCheckInError.FUTURE_DATE ->
+                "No puedes registrar una fecha futura."
+        }
 }

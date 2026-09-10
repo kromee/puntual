@@ -92,6 +92,8 @@ class HomeViewModel @Inject constructor(
                             "No hay periodo activo. Configura un corte en Config."
                         RegisterCheckInError.OUTSIDE_ACTIVE_PERIOD ->
                             "Hoy queda fuera del bloque activo. Haz un corte en Config."
+                        RegisterCheckInError.FUTURE_DATE ->
+                            "No puedes registrar una fecha futura."
                     }
                     updateReady { it.copy(isRegistering = false, errorMessage = message) }
                 }

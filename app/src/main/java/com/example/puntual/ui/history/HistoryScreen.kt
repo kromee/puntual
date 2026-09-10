@@ -16,15 +16,23 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,6 +53,9 @@ import com.example.puntual.ui.theme.OnTimeGreen
 import com.example.puntual.ui.theme.PuntualGreen
 import com.example.puntual.ui.theme.TextSecondary
 import com.example.puntual.ui.theme.TextPrimary
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 @Composable
 fun HistoryScreen(
@@ -121,6 +132,22 @@ fun HistoryScreen(
                 color = TextSecondary,
             )
             Spacer(modifier = Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = viewModel::openManualCheckInDialog,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Agregar registro manual")
+            }
+            val manualSuccess = uiState.manualCheckInSuccess
+            if (manualSuccess != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = manualSuccess,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = PuntualGreen,
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
 
             if (uiState.isEmpty) {
                 PuntualElevatedCard {
@@ -153,8 +180,21 @@ fun HistoryScreen(
                 }
             }
         }
+        }
     }
-}
+    if (uiState.showManualCheckInDialog) {
+        ManualCheckInDialog(
+            date = uiState.manualCheckInDate,
+            hour = uiState.manualCheckInHour,
+            minute = uiState.manualCheckInMinute,
+            errorMessage = uiState.manualCheckInError,
+            isLoading = uiState.isSavingManualCheckIn,
+            onDateSelected = viewModel::onManualCheckInDateSelected,
+            onTimeSelected = viewModel::onManualCheckInTimeSelected,
+            onDismiss = viewModel::dismissManualCheckInDialog,
+            onConfirm = viewModel::confirmManualCheckIn,
+        )
+    }
 }
 
 @Composable
@@ -176,6 +216,120 @@ private fun HistoryLoadingCard() {
         }
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ManualCheckInDialog(
+    date: LocalDate,
+    hour: Int,
+    minute: Int,
+    errorMessage: String?,
+    isLoading: Boolean,
+    onDateSelected: (LocalDate) -> Unit,
+    onTimeSelected: (Int, Int) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: (Int, Int) -> Unit,
+) {
+    var showDatePicker by remember { mutableStateOf(false) }
+    val timePickerState = rememberTimePickerState(
+        initialHour = hour,
+        initialMinute = minute,
+        is24Hour = true,
+    )
+
+    if (showDatePicker) {
+        ManualCheckInDatePickerDialog(
+            initialDate = date,
+            onDismiss = { showDatePicker = false },
+            onConfirm = { selected ->
+                onDateSelected(selected)
+                showDatePicker = false
+            },
+        )
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Agregar registro") },
+        text = {
+            Column {
+                if (errorMessage != null) {
+                    Text(
+                        text = errorMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+                OutlinedButton(
+                    onClick = { showDatePicker = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isLoading,
+                ) {
+                    Text("Fecha: ${formatManualCheckInDate(date)}")
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                TimePicker(state = timePickerState)
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = !isLoading,
+                onClick = {
+                    onTimeSelected(timePickerState.hour, timePickerState.minute)
+                    onConfirm(timePickerState.hour, timePickerState.minute)
+                },
+            ) {
+                Text(if (isLoading) "Guardando..." else "Guardar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isLoading) {
+                Text("Cancelar")
+            }
+        },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ManualCheckInDatePickerDialog(
+    initialDate: LocalDate,
+    onDismiss: () -> Unit,
+    onConfirm: (LocalDate) -> Unit,
+) {
+    val initialMillis = initialDate
+        .atStartOfDay(ZoneId.systemDefault())
+        .toInstant()
+        .toEpochMilli()
+    val state = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val millis = state.selectedDateMillis ?: return@TextButton
+                    val selected = Instant.ofEpochMilli(millis)
+                        .atZone(ZoneId.systemDefault())
+                        .toLocalDate()
+                    onConfirm(selected)
+                },
+            ) {
+                Text("Aceptar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        },
+    ) {
+        DatePicker(state = state)
+    }
+}
+
+private fun formatManualCheckInDate(date: LocalDate): String =
+    "${date.dayOfMonth}/${date.monthValue}/${date.year}"
 
 @Composable
 private fun YearTotalsCard(

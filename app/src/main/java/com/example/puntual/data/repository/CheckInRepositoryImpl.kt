@@ -144,6 +144,32 @@ class CheckInRepositoryImpl @Inject constructor(
         return registerWithPrefs(session, active.id, today, prefs)
     }
 
+    override suspend fun registerManualCheckIn(
+        workDate: LocalDate,
+        periodId: Long,
+        hour: Int,
+        minute: Int,
+    ): RegisterCheckInResult {
+        val session = sessionDataStore.sessionFlow.first()
+            ?: return RegisterCheckInResult.Error(RegisterCheckInError.NO_ACTIVE_PERIOD)
+        if (workDate.isAfter(LocalDate.now())) {
+            return RegisterCheckInResult.Error(RegisterCheckInError.FUTURE_DATE)
+        }
+        if (!WorkdayRules.isWorkday(workDate)) {
+            return RegisterCheckInResult.Error(RegisterCheckInError.NOT_WORKDAY)
+        }
+        val period = loadPeriod(session, periodId)
+            ?: return RegisterCheckInResult.Error(RegisterCheckInError.NO_ACTIVE_PERIOD)
+        if (!period.contains(workDate)) {
+            return RegisterCheckInResult.Error(RegisterCheckInError.OUTSIDE_ACTIVE_PERIOD)
+        }
+        if (existingCheckIn(session, periodId, workDate) != null) {
+            return RegisterCheckInResult.Error(RegisterCheckInError.ALREADY_REGISTERED)
+        }
+        val prefs = preferencesDataStore.preferencesFlow.first()
+        return registerWithPrefs(session, periodId, workDate, prefs, hour, minute)
+    }
+
     override suspend fun updateCheckInTime(
         workDate: LocalDate,
         periodId: Long,
@@ -202,9 +228,15 @@ class CheckInRepositoryImpl @Inject constructor(
         periodId: Long,
         today: LocalDate,
         prefs: UserPreferences,
+        manualHour: Int? = null,
+        manualMinute: Int? = null,
     ): RegisterCheckInResult {
         val zone = ZoneId.systemDefault()
-        val now = DelayCalculator.now(zone)
+        val now = if (manualHour != null && manualMinute != null) {
+            today.atTime(manualHour, manualMinute).atZone(zone)
+        } else {
+            DelayCalculator.now(zone)
+        }
         val expectedTime = if (prefs.hasExpectedTime) {
             LocalTime.of(prefs.expectedHour, prefs.expectedMinute)
         } else {

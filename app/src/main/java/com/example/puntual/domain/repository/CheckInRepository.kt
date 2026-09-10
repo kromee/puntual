@@ -19,6 +19,7 @@ enum class RegisterCheckInError {
     ALREADY_REGISTERED,
     NO_ACTIVE_PERIOD,
     OUTSIDE_ACTIVE_PERIOD,
+    FUTURE_DATE,
 }
 
 interface CheckInRepository {
@@ -29,6 +30,12 @@ interface CheckInRepository {
     fun observeYearMonthlyBreakdown(periodId: Long, year: Int): Flow<List<MonthBreakdown>>
     suspend fun getAvailableYears(periodId: Long): List<Int>
     suspend fun registerCheckIn(): RegisterCheckInResult
+    suspend fun registerManualCheckIn(
+        workDate: LocalDate,
+        periodId: Long,
+        hour: Int,
+        minute: Int,
+    ): RegisterCheckInResult
     suspend fun updateCheckInTime(workDate: LocalDate, periodId: Long, hour: Int, minute: Int): Boolean
     suspend fun setDisplayName(name: String)
     suspend fun setExpectedTime(hour: Int, minute: Int)
