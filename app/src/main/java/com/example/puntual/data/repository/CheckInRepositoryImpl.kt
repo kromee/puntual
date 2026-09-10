@@ -152,12 +152,18 @@ class CheckInRepositoryImpl @Inject constructor(
     ): Boolean {
         val session = sessionDataStore.sessionFlow.first() ?: return false
         val existing = existingCheckIn(session, periodId, workDate) ?: return false
+        val prefs = preferencesDataStore.preferencesFlow.first()
+        val expectedTime = if (prefs.hasExpectedTime) {
+            LocalTime.of(prefs.expectedHour, prefs.expectedMinute)
+        } else {
+            existing.expectedTime
+        }
         val zone = ZoneId.systemDefault()
         val updatedAt = workDate.atTime(hour, minute).atZone(zone)
         val delayMinutes = DelayCalculator.calculateDelayMinutes(
             workDate,
             updatedAt,
-            existing.expectedTime,
+            expectedTime,
         )
         return runCatching {
             api.updateCheckIn(
@@ -166,6 +172,8 @@ class CheckInRepositoryImpl @Inject constructor(
                 workDate = "eq.$workDate",
                 checkIn = SupabaseCheckInPatchDto(
                     checkedInAt = updatedAt.toInstant().toString(),
+                    expectedHour = expectedTime.hour,
+                    expectedMinute = expectedTime.minute,
                     delayMinutes = delayMinutes,
                 ),
             )

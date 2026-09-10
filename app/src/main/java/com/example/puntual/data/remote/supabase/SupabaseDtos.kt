@@ -73,6 +73,10 @@ data class SupabaseCheckInInsertDto(
 data class SupabaseCheckInPatchDto(
     @SerializedName("checked_in_at")
     val checkedInAt: String,
+    @SerializedName("expected_hour")
+    val expectedHour: Int,
+    @SerializedName("expected_minute")
+    val expectedMinute: Int,
     @SerializedName("delay_minutes")
     val delayMinutes: Int,
 )
