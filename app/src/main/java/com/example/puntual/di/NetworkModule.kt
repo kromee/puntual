@@ -6,6 +6,7 @@ import com.example.puntual.data.remote.supabase.PuntuallSupabaseApi
 import com.example.puntual.data.remote.supabase.SupabaseAuthHeadersInterceptor
 import com.example.puntual.data.remote.supabase.SupabaseConfig
 import com.example.puntual.data.remote.supabase.SupabaseHeadersInterceptor
+import com.example.puntual.data.remote.supabase.SupabaseSessionAuthenticator
 import com.example.puntual.data.remote.supabase.auth.SupabaseAuthApi
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
@@ -55,9 +56,11 @@ object NetworkModule {
     @Named("supabase")
     fun provideSupabaseOkHttpClient(
         headersInterceptor: SupabaseHeadersInterceptor,
+        sessionAuthenticator: SupabaseSessionAuthenticator,
     ): OkHttpClient =
         OkHttpClient.Builder()
             .addInterceptor(headersInterceptor)
+            .authenticator(sessionAuthenticator)
             .build()
 
     @Provides

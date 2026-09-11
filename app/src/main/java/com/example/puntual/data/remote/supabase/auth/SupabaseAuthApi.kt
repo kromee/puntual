@@ -11,4 +11,10 @@ interface SupabaseAuthApi {
         @Query("grant_type") grantType: String = "password",
         @Body request: SupabaseSignInRequest,
     ): SupabaseAuthResponse
+
+    @POST("token")
+    suspend fun refreshSession(
+        @Query("grant_type") grantType: String = "refresh_token",
+        @Body request: SupabaseRefreshTokenRequest,
+    ): SupabaseAuthResponse
 }

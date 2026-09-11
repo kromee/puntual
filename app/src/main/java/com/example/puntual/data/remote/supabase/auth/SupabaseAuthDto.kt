@@ -7,6 +7,11 @@ data class SupabaseSignInRequest(
     val password: String,
 )
 
+data class SupabaseRefreshTokenRequest(
+    @SerializedName("refresh_token")
+    val refreshToken: String,
+)
+
 data class SupabaseAuthResponse(
     @SerializedName("access_token")
     val accessToken: String,
