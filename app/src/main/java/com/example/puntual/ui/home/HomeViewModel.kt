@@ -75,10 +75,10 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun onRegisterClick() {
+    fun onRegisterClick(identityVerified: Boolean = false) {
         viewModelScope.launch {
             updateReady { it.copy(isRegistering = true, errorMessage = null) }
-            when (val result = repository.registerCheckIn()) {
+            when (val result = repository.registerCheckIn(identityVerified = identityVerified)) {
                 is RegisterCheckInResult.Success -> {
                     updateReady { it.copy(isRegistering = false, errorMessage = null) }
                 }
@@ -127,12 +127,18 @@ class HomeViewModel @Inject constructor(
         updateReady { it.copy(showEditTimePicker = false) }
     }
 
-    fun onEditTimeSelected(hour: Int, minute: Int) {
+    fun onEditTimeSelected(hour: Int, minute: Int, identityVerified: Boolean = false) {
         viewModelScope.launch {
             updateReady { it.copy(showEditTimePicker = false, errorMessage = null) }
             val result = runCatching {
                 val period = periodRepository.observeActivePeriod().first() ?: return@runCatching false
-                repository.updateCheckInTime(LocalDate.now(), period.id, hour, minute)
+                repository.updateCheckInTime(
+                    workDate = LocalDate.now(),
+                    periodId = period.id,
+                    hour = hour,
+                    minute = minute,
+                    identityVerified = identityVerified,
+                )
             }
             result.onSuccess { updated ->
                 if (!updated) {

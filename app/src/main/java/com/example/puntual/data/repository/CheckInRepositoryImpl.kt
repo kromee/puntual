@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import retrofit2.HttpException
 
 @Singleton
 class CheckInRepositoryImpl @Inject constructor(
@@ -125,7 +126,7 @@ class CheckInRepositoryImpl @Inject constructor(
         return PeriodDateRules.availableYears(period)
     }
 
-    override suspend fun registerCheckIn(): RegisterCheckInResult {
+    override suspend fun registerCheckIn(identityVerified: Boolean): RegisterCheckInResult {
         val session = sessionDataStore.sessionFlow.first()
             ?: return RegisterCheckInResult.Error(RegisterCheckInError.NO_ACTIVE_PERIOD)
         val today = LocalDate.now()
@@ -141,7 +142,13 @@ class CheckInRepositoryImpl @Inject constructor(
             return RegisterCheckInResult.Error(RegisterCheckInError.ALREADY_REGISTERED)
         }
         val prefs = preferencesDataStore.preferencesFlow.first()
-        return registerWithPrefs(session, active.id, today, prefs)
+        return registerWithPrefs(
+            session = session,
+            periodId = active.id,
+            today = today,
+            prefs = prefs,
+            identityVerified = identityVerified,
+        )
     }
 
     override suspend fun registerManualCheckIn(
@@ -149,6 +156,7 @@ class CheckInRepositoryImpl @Inject constructor(
         periodId: Long,
         hour: Int,
         minute: Int,
+        identityVerified: Boolean,
     ): RegisterCheckInResult {
         val session = sessionDataStore.sessionFlow.first()
             ?: return RegisterCheckInResult.Error(RegisterCheckInError.NO_ACTIVE_PERIOD)
@@ -167,7 +175,7 @@ class CheckInRepositoryImpl @Inject constructor(
             return RegisterCheckInResult.Error(RegisterCheckInError.ALREADY_REGISTERED)
         }
         val prefs = preferencesDataStore.preferencesFlow.first()
-        return registerWithPrefs(session, periodId, workDate, prefs, hour, minute)
+        return registerWithPrefs(session, periodId, workDate, prefs, hour, minute, identityVerified)
     }
 
     override suspend fun updateCheckInTime(
@@ -175,6 +183,7 @@ class CheckInRepositoryImpl @Inject constructor(
         periodId: Long,
         hour: Int,
         minute: Int,
+        identityVerified: Boolean,
     ): Boolean {
         val session = sessionDataStore.sessionFlow.first() ?: return false
         val existing = existingCheckIn(session, periodId, workDate) ?: return false
@@ -192,17 +201,16 @@ class CheckInRepositoryImpl @Inject constructor(
             expectedTime,
         )
         return runCatching {
-            api.updateCheckIn(
-                userId = "eq.${session.userId}",
-                periodId = "eq.$periodId",
-                workDate = "eq.$workDate",
-                checkIn = SupabaseCheckInPatchDto(
-                    checkedInAt = updatedAt.toInstant().toString(),
-                    expectedHour = expectedTime.hour,
-                    expectedMinute = expectedTime.minute,
-                    delayMinutes = delayMinutes,
-                ),
+            val patch = SupabaseCheckInPatchDto(
+                checkedInAt = updatedAt.toInstant().toString(),
+                expectedHour = expectedTime.hour,
+                expectedMinute = expectedTime.minute,
+                delayMinutes = delayMinutes,
+                identityVerified = identityVerified.takeIf { it },
+                identityMethod = "biometric".takeIf { identityVerified },
+                authorizedAt = java.time.Instant.now().toString().takeIf { identityVerified },
             )
+            updateCheckInWithEvidenceFallback(session.userId, periodId, workDate, patch)
             refreshEvents.emit(Unit)
             true
         }.getOrDefault(false)
@@ -234,6 +242,7 @@ class CheckInRepositoryImpl @Inject constructor(
         prefs: UserPreferences,
         manualHour: Int? = null,
         manualMinute: Int? = null,
+        identityVerified: Boolean = false,
     ): RegisterCheckInResult {
         val zone = ZoneId.systemDefault()
         val now = if (manualHour != null && manualMinute != null) {
@@ -257,10 +266,74 @@ class CheckInRepositoryImpl @Inject constructor(
             expectedTime = expectedTime,
             delayMinutes = delayMinutes,
         )
-        api.createCheckIn(checkIn.toSupabaseInsert(session.userId, periodId))
+        val insert = checkIn.toSupabaseInsert(
+            userId = session.userId,
+            periodId = periodId,
+            identityVerified = identityVerified,
+            authorizedAt = java.time.Instant.now().takeIf { identityVerified },
+        )
+        createCheckInWithEvidenceFallback(insert)
         refreshEvents.emit(Unit)
         return RegisterCheckInResult.Success(checkIn)
     }
+
+    private suspend fun createCheckInWithEvidenceFallback(checkIn: com.example.puntual.data.remote.supabase.SupabaseCheckInInsertDto) {
+        runCatching {
+            api.createCheckIn(checkIn)
+        }.recoverCatching { error ->
+            if (checkIn.hasIdentityEvidence() && error.isMissingEvidenceColumn()) {
+                api.createCheckIn(
+                    checkIn.copy(
+                        identityVerified = null,
+                        identityMethod = null,
+                        authorizedAt = null,
+                    ),
+                )
+            } else {
+                throw error
+            }
+        }.getOrThrow()
+    }
+
+    private suspend fun updateCheckInWithEvidenceFallback(
+        userId: String,
+        periodId: Long,
+        workDate: LocalDate,
+        checkIn: SupabaseCheckInPatchDto,
+    ) {
+        runCatching {
+            api.updateCheckIn(
+                userId = "eq.$userId",
+                periodId = "eq.$periodId",
+                workDate = "eq.$workDate",
+                checkIn = checkIn,
+            )
+        }.recoverCatching { error ->
+            if (checkIn.hasIdentityEvidence() && error.isMissingEvidenceColumn()) {
+                api.updateCheckIn(
+                    userId = "eq.$userId",
+                    periodId = "eq.$periodId",
+                    workDate = "eq.$workDate",
+                    checkIn = checkIn.copy(
+                        identityVerified = null,
+                        identityMethod = null,
+                        authorizedAt = null,
+                    ),
+                )
+            } else {
+                throw error
+            }
+        }.getOrThrow()
+    }
+
+    private fun Throwable.isMissingEvidenceColumn(): Boolean =
+        this is HttpException && code() == 400
+
+    private fun com.example.puntual.data.remote.supabase.SupabaseCheckInInsertDto.hasIdentityEvidence(): Boolean =
+        identityVerified != null || identityMethod != null || authorizedAt != null
+
+    private fun SupabaseCheckInPatchDto.hasIdentityEvidence(): Boolean =
+        identityVerified != null || identityMethod != null || authorizedAt != null
 
     private suspend fun existingCheckIn(
         session: AuthSession,

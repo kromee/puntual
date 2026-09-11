@@ -68,6 +68,12 @@ data class SupabaseCheckInInsertDto(
     val expectedMinute: Int,
     @SerializedName("delay_minutes")
     val delayMinutes: Int,
+    @SerializedName("identity_verified")
+    val identityVerified: Boolean? = null,
+    @SerializedName("identity_method")
+    val identityMethod: String? = null,
+    @SerializedName("authorized_at")
+    val authorizedAt: String? = null,
 )
 
 data class SupabaseCheckInPatchDto(
@@ -79,6 +85,12 @@ data class SupabaseCheckInPatchDto(
     val expectedMinute: Int,
     @SerializedName("delay_minutes")
     val delayMinutes: Int,
+    @SerializedName("identity_verified")
+    val identityVerified: Boolean? = null,
+    @SerializedName("identity_method")
+    val identityMethod: String? = null,
+    @SerializedName("authorized_at")
+    val authorizedAt: String? = null,
 )
 
 data class SupabaseAbsenceDto(

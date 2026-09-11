@@ -29,14 +29,21 @@ interface CheckInRepository {
     fun observeYearSummary(periodId: Long, year: Int): Flow<YearSummary>
     fun observeYearMonthlyBreakdown(periodId: Long, year: Int): Flow<List<MonthBreakdown>>
     suspend fun getAvailableYears(periodId: Long): List<Int>
-    suspend fun registerCheckIn(): RegisterCheckInResult
+    suspend fun registerCheckIn(identityVerified: Boolean = false): RegisterCheckInResult
     suspend fun registerManualCheckIn(
         workDate: LocalDate,
         periodId: Long,
         hour: Int,
         minute: Int,
+        identityVerified: Boolean = false,
     ): RegisterCheckInResult
-    suspend fun updateCheckInTime(workDate: LocalDate, periodId: Long, hour: Int, minute: Int): Boolean
+    suspend fun updateCheckInTime(
+        workDate: LocalDate,
+        periodId: Long,
+        hour: Int,
+        minute: Int,
+        identityVerified: Boolean = false,
+    ): Boolean
     suspend fun setDisplayName(name: String)
     suspend fun setExpectedTime(hour: Int, minute: Int)
     suspend fun clearExpectedTime()

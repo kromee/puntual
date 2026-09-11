@@ -39,7 +39,12 @@ fun SupabaseCheckInDto.toDomain(): CheckIn = CheckIn(
     delayMinutes = delayMinutes,
 )
 
-fun CheckIn.toSupabaseInsert(userId: String, periodId: Long): SupabaseCheckInInsertDto =
+fun CheckIn.toSupabaseInsert(
+    userId: String,
+    periodId: Long,
+    identityVerified: Boolean = false,
+    authorizedAt: Instant? = null,
+): SupabaseCheckInInsertDto =
     SupabaseCheckInInsertDto(
         userId = userId,
         periodId = periodId,
@@ -48,6 +53,9 @@ fun CheckIn.toSupabaseInsert(userId: String, periodId: Long): SupabaseCheckInIns
         expectedHour = expectedTime.hour,
         expectedMinute = expectedTime.minute,
         delayMinutes = delayMinutes,
+        identityVerified = identityVerified.takeIf { it },
+        identityMethod = "biometric".takeIf { identityVerified },
+        authorizedAt = authorizedAt?.toString(),
     )
 
 fun SupabaseAbsenceDto.toDomain(): Absence = Absence(

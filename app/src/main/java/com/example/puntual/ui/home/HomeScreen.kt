@@ -64,9 +64,14 @@ fun HomeScreen(
                 object : BiometricPrompt.AuthenticationCallback() {
                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                         when (pendingAction) {
-                            SensitiveHomeAction.REGISTER_CHECK_IN -> viewModel.onRegisterClick()
+                            SensitiveHomeAction.REGISTER_CHECK_IN ->
+                                viewModel.onRegisterClick(identityVerified = true)
                             SensitiveHomeAction.SAVE_EDITED_TIME ->
-                                viewModel.onEditTimeSelected(pendingEditHour, pendingEditMinute)
+                                viewModel.onEditTimeSelected(
+                                    hour = pendingEditHour,
+                                    minute = pendingEditMinute,
+                                    identityVerified = true,
+                                )
                             null -> Unit
                         }
                         pendingAction = null
