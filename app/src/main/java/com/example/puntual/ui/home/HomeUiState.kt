@@ -21,5 +21,6 @@ sealed interface HomeUiState {
         val motivationalQuoteLoading: Boolean = false,
         val motivationalQuoteText: String = "",
         val motivationalQuoteAuthor: String = "",
+        val biometricUnlockEnabled: Boolean = true,
     ) : HomeUiState
 }

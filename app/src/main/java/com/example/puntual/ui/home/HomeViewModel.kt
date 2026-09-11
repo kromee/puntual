@@ -178,6 +178,7 @@ class HomeViewModel @Inject constructor(
             motivationalQuoteLoading = current?.motivationalQuoteLoading == true,
             motivationalQuoteText = current?.motivationalQuoteText.orEmpty(),
             motivationalQuoteAuthor = current?.motivationalQuoteAuthor.orEmpty(),
+            biometricUnlockEnabled = prefs.biometricUnlockEnabled,
         )
     }
 
