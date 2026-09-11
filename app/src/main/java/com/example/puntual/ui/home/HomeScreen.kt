@@ -43,17 +43,15 @@ fun HomeScreen(
     var pendingEditHour by remember { mutableStateOf(0) }
     var pendingEditMinute by remember { mutableStateOf(0) }
     var biometricError by remember { mutableStateOf<String?>(null) }
-    val canUseBiometrics = remember(context) {
-        BiometricManager.from(context).canAuthenticate(
-            BiometricManager.Authenticators.BIOMETRIC_STRONG,
-        ) == BiometricManager.BIOMETRIC_SUCCESS
+    val canUseDeviceSecurity = remember(context) {
+        BiometricManager.from(context).canAuthenticate(DEVICE_AUTHENTICATORS) ==
+            BiometricManager.BIOMETRIC_SUCCESS
     }
     val promptInfo = remember {
         BiometricPrompt.PromptInfo.Builder()
             .setTitle("Autorizar acción")
             .setSubtitle("Confirma tu identidad para continuar en Puntuall")
-            .setNegativeButtonText("Cancelar")
-            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+            .setAllowedAuthenticators(DEVICE_AUTHENTICATORS)
             .build()
     }
     val biometricPrompt = remember(activity) {
@@ -87,7 +85,7 @@ fun HomeScreen(
                     }
 
                     override fun onAuthenticationFailed() {
-                        biometricError = "No se pudo validar la huella. Intenta de nuevo."
+                        biometricError = "No se pudo validar tu identidad. Intenta de nuevo."
                     }
                 },
             )
@@ -108,14 +106,19 @@ fun HomeScreen(
                     minute: Int = 0,
                     fallback: () -> Unit,
                 ) {
-                    if (state.biometricUnlockEnabled && canUseBiometrics && biometricPrompt != null) {
+                    if (!state.biometricUnlockEnabled) {
+                        fallback()
+                    } else if (canUseDeviceSecurity && biometricPrompt != null) {
                         pendingAction = action
                         pendingEditHour = hour
                         pendingEditMinute = minute
                         biometricError = null
                         biometricPrompt.authenticate(promptInfo)
                     } else {
-                        fallback()
+                        if (action == SensitiveHomeAction.SAVE_EDITED_TIME) {
+                            viewModel.dismissEditTimePicker()
+                        }
+                        biometricError = "Este dispositivo necesita huella, PIN, patrón o contraseña para autorizar registros."
                     }
                 }
 
@@ -142,14 +145,17 @@ fun HomeScreen(
                     initialMinute = state.editTimeMinute,
                     onDismiss = viewModel::dismissEditTimePicker,
                     onConfirm = { hour, minute ->
-                        if (state.biometricUnlockEnabled && canUseBiometrics && biometricPrompt != null) {
+                        if (!state.biometricUnlockEnabled) {
+                            viewModel.onEditTimeSelected(hour, minute)
+                        } else if (canUseDeviceSecurity && biometricPrompt != null) {
                             pendingAction = SensitiveHomeAction.SAVE_EDITED_TIME
                             pendingEditHour = hour
                             pendingEditMinute = minute
                             biometricError = null
                             biometricPrompt.authenticate(promptInfo)
                         } else {
-                            viewModel.onEditTimeSelected(hour, minute)
+                            viewModel.dismissEditTimePicker()
+                            biometricError = "Este dispositivo necesita huella, PIN, patrón o contraseña para autorizar registros."
                         }
                     },
                 )
@@ -308,3 +314,7 @@ private tailrec fun Context.findFragmentActivity(): FragmentActivity? =
         is ContextWrapper -> baseContext.findFragmentActivity()
         else -> null
     }
+
+private val DEVICE_AUTHENTICATORS =
+    BiometricManager.Authenticators.BIOMETRIC_STRONG or
+        BiometricManager.Authenticators.DEVICE_CREDENTIAL

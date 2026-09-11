@@ -55,16 +55,14 @@ fun PuntualApp(
     var isLocallyUnlocked by remember { mutableStateOf(false) }
     var biometricError by remember { mutableStateOf<String?>(null) }
     val biometricManager = remember(activity) { BiometricManager.from(activity) }
-    val canUseBiometrics = remember(activity) {
-        biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) ==
-            BiometricManager.BIOMETRIC_SUCCESS
+    val canUseDeviceSecurity = remember(activity) {
+        biometricManager.canAuthenticate(DEVICE_AUTHENTICATORS) == BiometricManager.BIOMETRIC_SUCCESS
     }
     val promptInfo = remember {
         BiometricPrompt.PromptInfo.Builder()
             .setTitle("Desbloquear Puntuall")
             .setSubtitle("Confirma tu identidad para entrar")
-            .setNegativeButtonText("Cancelar")
-            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+            .setAllowedAuthenticators(DEVICE_AUTHENTICATORS)
             .build()
     }
     val biometricPrompt = remember(activity) {
@@ -82,7 +80,7 @@ fun PuntualApp(
                 }
 
                 override fun onAuthenticationFailed() {
-                    biometricError = "No se pudo validar la huella. Intenta de nuevo."
+                    biometricError = "No se pudo validar tu identidad. Intenta de nuevo."
                 }
             },
         )
@@ -107,7 +105,7 @@ fun PuntualApp(
 
     val shouldRequireBiometricUnlock = authState.isAuthenticated &&
         securityState.biometricUnlockEnabled &&
-        canUseBiometrics
+        canUseDeviceSecurity
 
     LaunchedEffect(shouldRequireBiometricUnlock, isLocallyUnlocked) {
         if (shouldRequireBiometricUnlock && !isLocallyUnlocked) {
@@ -181,7 +179,7 @@ private fun BiometricUnlockScreen(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Confirma tu identidad para continuar.",
+                text = "Confirma tu identidad con huella, PIN, patrón o contraseña.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = TextSecondary,
             )
@@ -199,7 +197,7 @@ private fun BiometricUnlockScreen(
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = PuntualGreen),
             ) {
-                Text("Usar huella")
+                Text("Usar seguridad del dispositivo")
             }
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedButton(
@@ -239,3 +237,7 @@ private fun PuntualLaunchLoadingScreen() {
         }
     }
 }
+
+private val DEVICE_AUTHENTICATORS =
+    BiometricManager.Authenticators.BIOMETRIC_STRONG or
+        BiometricManager.Authenticators.DEVICE_CREDENTIAL

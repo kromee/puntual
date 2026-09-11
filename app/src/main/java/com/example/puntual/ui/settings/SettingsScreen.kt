@@ -55,9 +55,8 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val canUseBiometrics = BiometricManager.from(context).canAuthenticate(
-        BiometricManager.Authenticators.BIOMETRIC_STRONG,
-    ) == BiometricManager.BIOMETRIC_SUCCESS
+    val canUseDeviceSecurity = BiometricManager.from(context).canAuthenticate(DEVICE_AUTHENTICATORS) ==
+        BiometricManager.BIOMETRIC_SUCCESS
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -132,25 +131,25 @@ fun SettingsScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Desbloqueo biométrico",
+                            text = "Seguridad del dispositivo",
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Medium,
                             color = TextPrimary,
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = if (canUseBiometrics) {
-                                "Usa la huella configurada en Android para entrar."
+                            text = if (canUseDeviceSecurity) {
+                                "Usa huella, PIN, patrón o contraseña para entrar y autorizar registros."
                             } else {
-                                "Configura huella en Android para activar esta opción."
+                                "Configura bloqueo de pantalla en Android para autorizar registros."
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = TextSecondary,
                         )
                     }
                     Switch(
-                        checked = uiState.biometricUnlockEnabled && canUseBiometrics,
-                        enabled = canUseBiometrics,
+                        checked = uiState.biometricUnlockEnabled,
+                        enabled = canUseDeviceSecurity,
                         onCheckedChange = viewModel::onBiometricUnlockEnabledChange,
                     )
                 }
@@ -447,6 +446,10 @@ private fun AbsenceListItem(
         }
     }
 }
+
+private val DEVICE_AUTHENTICATORS =
+    BiometricManager.Authenticators.BIOMETRIC_STRONG or
+        BiometricManager.Authenticators.DEVICE_CREDENTIAL
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
