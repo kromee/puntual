@@ -20,6 +20,7 @@ enum class RegisterCheckInError {
     NO_ACTIVE_PERIOD,
     OUTSIDE_ACTIVE_PERIOD,
     FUTURE_DATE,
+    NETWORK,
 }
 
 interface CheckInRepository {

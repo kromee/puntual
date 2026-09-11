@@ -261,6 +261,8 @@ class SettingsViewModel @Inject constructor(
                             "El nuevo bloque debe empezar al día siguiente al cierre (ej. cierras 20 may → abre 21 may)."
                         ClosePeriodError.NEW_START_IN_FUTURE ->
                             "El inicio del nuevo bloque no puede ser después de hoy."
+                        ClosePeriodError.NETWORK ->
+                            "No se pudo conectar. Revisa tu internet e intenta de nuevo."
                     }
                     _uiState.update {
                         it.copy(isClosingPeriod = false, closePeriodError = message)
@@ -347,6 +349,8 @@ class SettingsViewModel @Inject constructor(
                             "La ausencia debe quedar dentro del bloque activo."
                         SaveAbsenceError.OVERLAPS_EXISTING_ABSENCE ->
                             "Ya existe una ausencia registrada para una o más fechas de ese rango."
+                        SaveAbsenceError.NETWORK ->
+                            "No se pudo conectar. Revisa tu internet e intenta de nuevo."
                     }
                     _uiState.update {
                         it.copy(isSavingAbsence = false, absenceError = message)

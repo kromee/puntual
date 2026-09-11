@@ -9,6 +9,7 @@ enum class ClosePeriodError {
     END_BEFORE_START,
     NEW_START_NOT_AFTER_END,
     NEW_START_IN_FUTURE,
+    NETWORK,
 }
 
 sealed class ClosePeriodResult {

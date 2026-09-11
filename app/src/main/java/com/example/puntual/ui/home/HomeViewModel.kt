@@ -94,6 +94,8 @@ class HomeViewModel @Inject constructor(
                             "Hoy queda fuera del bloque activo. Haz un corte en Config."
                         RegisterCheckInError.FUTURE_DATE ->
                             "No puedes registrar una fecha futura."
+                        RegisterCheckInError.NETWORK ->
+                            "No se pudo conectar. Revisa tu internet e intenta de nuevo."
                     }
                     updateReady { it.copy(isRegistering = false, errorMessage = message) }
                 }

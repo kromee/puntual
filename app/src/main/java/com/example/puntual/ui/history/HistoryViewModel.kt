@@ -414,5 +414,7 @@ class HistoryViewModel @Inject constructor(
                 "La fecha queda fuera del periodo seleccionado."
             RegisterCheckInError.FUTURE_DATE ->
                 "No puedes registrar una fecha futura."
+            RegisterCheckInError.NETWORK ->
+                "No se pudo conectar. Revisa tu internet e intenta de nuevo."
         }
 }

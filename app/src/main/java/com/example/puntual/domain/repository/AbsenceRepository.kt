@@ -15,6 +15,7 @@ enum class SaveAbsenceError {
     END_BEFORE_START,
     OUTSIDE_ACTIVE_PERIOD,
     OVERLAPS_EXISTING_ABSENCE,
+    NETWORK,
 }
 
 interface AbsenceRepository {

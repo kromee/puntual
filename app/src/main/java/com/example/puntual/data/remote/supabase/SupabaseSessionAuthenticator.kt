@@ -12,6 +12,7 @@ import okhttp3.Authenticator
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.Route
+import retrofit2.HttpException
 
 @Singleton
 class SupabaseSessionAuthenticator @Inject constructor(
@@ -54,7 +55,9 @@ class SupabaseSessionAuthenticator @Inject constructor(
                 refreshToken = response.refreshToken,
             ).also { sessionDataStore.saveSession(it) }
         }.getOrElse {
-            sessionDataStore.clearSession()
+            if (it is HttpException && (it.code() == HTTP_BAD_REQUEST || it.code() == HTTP_UNAUTHORIZED)) {
+                sessionDataStore.clearSession()
+            }
             null
         }
 
@@ -77,5 +80,7 @@ class SupabaseSessionAuthenticator @Inject constructor(
 
     private companion object {
         const val MAX_AUTH_ATTEMPTS = 2
+        const val HTTP_BAD_REQUEST = 400
+        const val HTTP_UNAUTHORIZED = 401
     }
 }

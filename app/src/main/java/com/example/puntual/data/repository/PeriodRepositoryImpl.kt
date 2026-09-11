@@ -21,7 +21,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import retrofit2.HttpException
 
 @Singleton
 class PeriodRepositoryImpl @Inject constructor(
@@ -66,40 +65,44 @@ class PeriodRepositoryImpl @Inject constructor(
         newStartDate: LocalDate,
         newTitle: String?,
     ): ClosePeriodResult {
-        val session = sessionDataStore.sessionFlow.first()
-            ?: return ClosePeriodResult.Error(ClosePeriodError.NO_ACTIVE_PERIOD)
-        val active = activePeriod(session)
-            ?: return ClosePeriodResult.Error(ClosePeriodError.NO_ACTIVE_PERIOD)
+        return runCatching {
+            val session = sessionDataStore.sessionFlow.first()
+                ?: return ClosePeriodResult.Error(ClosePeriodError.NO_ACTIVE_PERIOD)
+            val active = activePeriod(session)
+                ?: return ClosePeriodResult.Error(ClosePeriodError.NO_ACTIVE_PERIOD)
 
-        ClosePeriodDateDefaults.validate(active.startDate, endDate, newStartDate)?.let { error ->
-            return ClosePeriodResult.Error(error)
+            ClosePeriodDateDefaults.validate(active.startDate, endDate, newStartDate)?.let { error ->
+                return ClosePeriodResult.Error(error)
+            }
+
+            val closedTitle = defaultPeriodTitle(active.startDate, endDate)
+            api.updatePeriod(
+                id = "eq.${active.id}",
+                userId = "eq.${session.userId}",
+                period = SupabaseAttendancePeriodPatchDto(
+                    title = closedTitle,
+                    endDate = endDate.toString(),
+                    isActive = false,
+                ),
+            )
+            val opened = api.createPeriod(
+                SupabaseAttendancePeriodUpsertDto(
+                    userId = session.userId,
+                    title = newTitle?.trim().takeUnless { it.isNullOrBlank() }
+                        ?: defaultPeriodTitle(newStartDate, null),
+                    startDate = newStartDate.toString(),
+                    endDate = null,
+                    isActive = true,
+                ),
+            ).first().toDomain()
+            refreshEvents.emit(Unit)
+            ClosePeriodResult.Success(
+                closed = active.copy(title = closedTitle, endDate = endDate, isActive = false),
+                opened = opened,
+            )
+        }.getOrElse {
+            ClosePeriodResult.Error(ClosePeriodError.NETWORK)
         }
-
-        val closedTitle = defaultPeriodTitle(active.startDate, endDate)
-        api.updatePeriod(
-            id = "eq.${active.id}",
-            userId = "eq.${session.userId}",
-            period = SupabaseAttendancePeriodPatchDto(
-                title = closedTitle,
-                endDate = endDate.toString(),
-                isActive = false,
-            ),
-        )
-        val opened = api.createPeriod(
-            SupabaseAttendancePeriodUpsertDto(
-                userId = session.userId,
-                title = newTitle?.trim().takeUnless { it.isNullOrBlank() }
-                    ?: defaultPeriodTitle(newStartDate, null),
-                startDate = newStartDate.toString(),
-                endDate = null,
-                isActive = true,
-            ),
-        ).first().toDomain()
-        refreshEvents.emit(Unit)
-        return ClosePeriodResult.Success(
-            closed = active.copy(title = closedTitle, endDate = endDate, isActive = false),
-            opened = opened,
-        )
     }
 
     private fun sessionFlow(): Flow<AuthSession?> =
@@ -129,17 +132,11 @@ class PeriodRepositoryImpl @Inject constructor(
     private suspend fun <T> authenticatedOrDefault(defaultValue: T, block: suspend () -> T): T =
         try {
             block()
-        } catch (error: HttpException) {
-            if (error.code() == HTTP_UNAUTHORIZED) {
-                sessionDataStore.clearSession()
-            }
-            defaultValue
         } catch (_: Exception) {
             defaultValue
         }
 
     private companion object {
-        const val HTTP_UNAUTHORIZED = 401
         val DEFAULT_START_DATE: LocalDate = LocalDate.of(HistoryPeriodRules.FIRST_HISTORY_YEAR, 1, 1)
     }
 }

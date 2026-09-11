@@ -60,95 +60,108 @@ class CheckInRepositoryImpl @Inject constructor(
 
     override fun observeMonthHistory(periodId: Long, yearMonth: YearMonth): Flow<MonthHistory> =
         sessionFlow().map { session ->
-            val period = session?.let { loadPeriod(it, periodId) }
-                ?: return@map emptyMonthHistory(yearMonth)
-            val range = PeriodDateRules.intersectMonth(period, yearMonth)
-                ?: return@map emptyMonthHistory(yearMonth)
-            val checkIns = loadCheckIns(session, periodId, range.start, range.endInclusive)
-            val absences = api.getAbsencesBetween(
-                userId = "eq.${session.userId}",
-                periodId = "eq.$periodId",
-                startsBeforeEnd = "lte.${range.endInclusive}",
-                endsAfterStart = "gte.${range.start}",
-            ).map { it.toDomain() }.sortedBy { it.startDate }
-            MonthHistory(
-                yearMonth = yearMonth,
-                checkIns = checkIns,
-                absences = absences,
-                lateDaysCount = checkIns.count { it.delayMinutes > 0 },
-                totalDelayMinutes = checkIns.sumOf { it.delayMinutes },
-            )
+            runCatching {
+                val period = session?.let { loadPeriod(it, periodId) }
+                    ?: return@map emptyMonthHistory(yearMonth)
+                val range = PeriodDateRules.intersectMonth(period, yearMonth)
+                    ?: return@map emptyMonthHistory(yearMonth)
+                val checkIns = loadCheckIns(session, periodId, range.start, range.endInclusive)
+                val absences = loadAbsences(session, periodId, range.start, range.endInclusive)
+                MonthHistory(
+                    yearMonth = yearMonth,
+                    checkIns = checkIns,
+                    absences = absences,
+                    lateDaysCount = checkIns.count { it.delayMinutes > 0 },
+                    totalDelayMinutes = checkIns.sumOf { it.delayMinutes },
+                )
+            }.getOrElse {
+                emptyMonthHistory(yearMonth)
+            }
         }
 
     override fun observeYearSummary(periodId: Long, year: Int): Flow<YearSummary> =
         sessionFlow().map { session ->
-            val period = session?.let { loadPeriod(it, periodId) }
-                ?: return@map YearSummary(year, 0, 0, 0)
-            val now = YearMonth.now()
-            val throughMonth = effectiveThroughMonth(period, year, now)
-            val range = PeriodDateRules.intersectYearSlice(period, year, throughMonth)
-                ?: return@map YearSummary(year, throughMonth, 0, 0)
-            val checkIns = loadCheckIns(session, periodId, range.start, range.endInclusive)
-            YearSummary(
-                year = year,
-                throughMonth = throughMonth,
-                lateDaysCount = checkIns.count { it.delayMinutes > 0 },
-                totalDelayMinutes = checkIns.sumOf { it.delayMinutes },
-            )
+            runCatching {
+                val period = session?.let { loadPeriod(it, periodId) }
+                    ?: return@map YearSummary(year, 0, 0, 0)
+                val now = YearMonth.now()
+                val throughMonth = effectiveThroughMonth(period, year, now)
+                val range = PeriodDateRules.intersectYearSlice(period, year, throughMonth)
+                    ?: return@map YearSummary(year, throughMonth, 0, 0)
+                val checkIns = loadCheckIns(session, periodId, range.start, range.endInclusive)
+                YearSummary(
+                    year = year,
+                    throughMonth = throughMonth,
+                    lateDaysCount = checkIns.count { it.delayMinutes > 0 },
+                    totalDelayMinutes = checkIns.sumOf { it.delayMinutes },
+                )
+            }.getOrElse {
+                YearSummary(year, 0, 0, 0)
+            }
         }
 
     override fun observeYearMonthlyBreakdown(periodId: Long, year: Int): Flow<List<MonthBreakdown>> =
         sessionFlow().map { session ->
-            val period = session?.let { loadPeriod(it, periodId) } ?: return@map emptyList()
-            val now = YearMonth.now()
-            val first = PeriodDateRules.firstSelectableMonth(period, year)
-            val last = PeriodDateRules.lastSelectableMonth(period, year, now)
-            if (first.year != year || last.year != year) return@map emptyList()
-            val range = PeriodDateRules.intersectYearSlice(period, year, last.monthValue)
-                ?: return@map monthsWithZeros(first, last)
-            val byMonth = loadCheckIns(session, periodId, range.start, range.endInclusive)
-                .groupBy { YearMonth.from(it.workDate) }
-                .mapValues { (yearMonth, monthCheckIns) ->
-                    MonthBreakdown(
-                        yearMonth = yearMonth,
-                        lateDaysCount = monthCheckIns.count { it.delayMinutes > 0 },
-                        totalDelayMinutes = monthCheckIns.sumOf { it.delayMinutes },
-                    )
+            runCatching {
+                val period = session?.let { loadPeriod(it, periodId) } ?: return@map emptyList()
+                val now = YearMonth.now()
+                val first = PeriodDateRules.firstSelectableMonth(period, year)
+                val last = PeriodDateRules.lastSelectableMonth(period, year, now)
+                if (first.year != year || last.year != year) return@map emptyList()
+                val range = PeriodDateRules.intersectYearSlice(period, year, last.monthValue)
+                    ?: return@map monthsWithZeros(first, last)
+                val byMonth = loadCheckIns(session, periodId, range.start, range.endInclusive)
+                    .groupBy { YearMonth.from(it.workDate) }
+                    .mapValues { (yearMonth, monthCheckIns) ->
+                        MonthBreakdown(
+                            yearMonth = yearMonth,
+                            lateDaysCount = monthCheckIns.count { it.delayMinutes > 0 },
+                            totalDelayMinutes = monthCheckIns.sumOf { it.delayMinutes },
+                        )
+                    }
+                monthsInRange(first, last).map { ym ->
+                    byMonth[ym] ?: MonthBreakdown(ym, 0, 0)
                 }
-            monthsInRange(first, last).map { ym ->
-                byMonth[ym] ?: MonthBreakdown(ym, 0, 0)
+            }.getOrElse {
+                emptyList()
             }
         }
 
     override suspend fun getAvailableYears(periodId: Long): List<Int> {
         val session = sessionDataStore.sessionFlow.first() ?: return listOf(Year.now().value)
-        val period = loadPeriod(session, periodId) ?: return listOf(Year.now().value)
-        return PeriodDateRules.availableYears(period)
+        return runCatching {
+            val period = loadPeriod(session, periodId) ?: return listOf(Year.now().value)
+            PeriodDateRules.availableYears(period)
+        }.getOrDefault(listOf(Year.now().value))
     }
 
     override suspend fun registerCheckIn(identityVerified: Boolean): RegisterCheckInResult {
-        val session = sessionDataStore.sessionFlow.first()
-            ?: return RegisterCheckInResult.Error(RegisterCheckInError.NO_ACTIVE_PERIOD)
-        val today = LocalDate.now()
-        if (!WorkdayRules.isWorkday(today)) {
-            return RegisterCheckInResult.Error(RegisterCheckInError.NOT_WORKDAY)
+        return runCatching {
+            val session = sessionDataStore.sessionFlow.first()
+                ?: return RegisterCheckInResult.Error(RegisterCheckInError.NO_ACTIVE_PERIOD)
+            val today = LocalDate.now()
+            if (!WorkdayRules.isWorkday(today)) {
+                return RegisterCheckInResult.Error(RegisterCheckInError.NOT_WORKDAY)
+            }
+            val active = activePeriod(session)
+                ?: return RegisterCheckInResult.Error(RegisterCheckInError.NO_ACTIVE_PERIOD)
+            if (!active.contains(today)) {
+                return RegisterCheckInResult.Error(RegisterCheckInError.OUTSIDE_ACTIVE_PERIOD)
+            }
+            if (existingCheckIn(session, active.id, today) != null) {
+                return RegisterCheckInResult.Error(RegisterCheckInError.ALREADY_REGISTERED)
+            }
+            val prefs = preferencesDataStore.preferencesFlow.first()
+            registerWithPrefs(
+                session = session,
+                periodId = active.id,
+                today = today,
+                prefs = prefs,
+                identityVerified = identityVerified,
+            )
+        }.getOrElse {
+            RegisterCheckInResult.Error(RegisterCheckInError.NETWORK)
         }
-        val active = activePeriod(session)
-            ?: return RegisterCheckInResult.Error(RegisterCheckInError.NO_ACTIVE_PERIOD)
-        if (!active.contains(today)) {
-            return RegisterCheckInResult.Error(RegisterCheckInError.OUTSIDE_ACTIVE_PERIOD)
-        }
-        if (existingCheckIn(session, active.id, today) != null) {
-            return RegisterCheckInResult.Error(RegisterCheckInError.ALREADY_REGISTERED)
-        }
-        val prefs = preferencesDataStore.preferencesFlow.first()
-        return registerWithPrefs(
-            session = session,
-            periodId = active.id,
-            today = today,
-            prefs = prefs,
-            identityVerified = identityVerified,
-        )
     }
 
     override suspend fun registerManualCheckIn(
@@ -158,24 +171,28 @@ class CheckInRepositoryImpl @Inject constructor(
         minute: Int,
         identityVerified: Boolean,
     ): RegisterCheckInResult {
-        val session = sessionDataStore.sessionFlow.first()
-            ?: return RegisterCheckInResult.Error(RegisterCheckInError.NO_ACTIVE_PERIOD)
-        if (workDate.isAfter(LocalDate.now())) {
-            return RegisterCheckInResult.Error(RegisterCheckInError.FUTURE_DATE)
+        return runCatching {
+            val session = sessionDataStore.sessionFlow.first()
+                ?: return RegisterCheckInResult.Error(RegisterCheckInError.NO_ACTIVE_PERIOD)
+            if (workDate.isAfter(LocalDate.now())) {
+                return RegisterCheckInResult.Error(RegisterCheckInError.FUTURE_DATE)
+            }
+            if (!WorkdayRules.isWorkday(workDate)) {
+                return RegisterCheckInResult.Error(RegisterCheckInError.NOT_WORKDAY)
+            }
+            val period = loadPeriod(session, periodId)
+                ?: return RegisterCheckInResult.Error(RegisterCheckInError.NO_ACTIVE_PERIOD)
+            if (!period.contains(workDate)) {
+                return RegisterCheckInResult.Error(RegisterCheckInError.OUTSIDE_ACTIVE_PERIOD)
+            }
+            if (existingCheckIn(session, periodId, workDate) != null) {
+                return RegisterCheckInResult.Error(RegisterCheckInError.ALREADY_REGISTERED)
+            }
+            val prefs = preferencesDataStore.preferencesFlow.first()
+            registerWithPrefs(session, periodId, workDate, prefs, hour, minute, identityVerified)
+        }.getOrElse {
+            RegisterCheckInResult.Error(RegisterCheckInError.NETWORK)
         }
-        if (!WorkdayRules.isWorkday(workDate)) {
-            return RegisterCheckInResult.Error(RegisterCheckInError.NOT_WORKDAY)
-        }
-        val period = loadPeriod(session, periodId)
-            ?: return RegisterCheckInResult.Error(RegisterCheckInError.NO_ACTIVE_PERIOD)
-        if (!period.contains(workDate)) {
-            return RegisterCheckInResult.Error(RegisterCheckInError.OUTSIDE_ACTIVE_PERIOD)
-        }
-        if (existingCheckIn(session, periodId, workDate) != null) {
-            return RegisterCheckInResult.Error(RegisterCheckInError.ALREADY_REGISTERED)
-        }
-        val prefs = preferencesDataStore.preferencesFlow.first()
-        return registerWithPrefs(session, periodId, workDate, prefs, hour, minute, identityVerified)
     }
 
     override suspend fun updateCheckInTime(
@@ -367,6 +384,18 @@ class CheckInRepositoryImpl @Inject constructor(
         workDateFrom = "gte.$startDate",
         workDateTo = "lte.$endDate",
     ).map { it.toDomain() }.sortedBy { it.workDate }
+
+    private suspend fun loadAbsences(
+        session: AuthSession,
+        periodId: Long,
+        startDate: LocalDate,
+        endDate: LocalDate,
+    ) = api.getAbsencesBetween(
+        userId = "eq.${session.userId}",
+        periodId = "eq.$periodId",
+        startsBeforeEnd = "lte.$endDate",
+        endsAfterStart = "gte.$startDate",
+    ).map { it.toDomain() }.sortedBy { it.startDate }
 
     private fun emptyMonthHistory(yearMonth: YearMonth) =
         MonthHistory(yearMonth, emptyList(), emptyList(), 0, 0)

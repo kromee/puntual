@@ -33,24 +33,28 @@ class AbsenceRepositoryImpl @Inject constructor(
         endDate: LocalDate,
     ): Flow<List<Absence>> =
         sessionFlow().map { session ->
-            session?.let {
-                api.getAbsencesBetween(
-                    userId = "eq.${it.userId}",
-                    periodId = "eq.$periodId",
-                    startsBeforeEnd = "lte.$endDate",
-                    endsAfterStart = "gte.$startDate",
-                ).map { dto -> dto.toDomain() }
-            } ?: emptyList()
+            runCatching {
+                session?.let {
+                    api.getAbsencesBetween(
+                        userId = "eq.${it.userId}",
+                        periodId = "eq.$periodId",
+                        startsBeforeEnd = "lte.$endDate",
+                        endsAfterStart = "gte.$startDate",
+                    ).map { dto -> dto.toDomain() }
+                } ?: emptyList()
+            }.getOrDefault(emptyList())
         }
 
     override fun observeAbsencesForPeriod(periodId: Long): Flow<List<Absence>> =
         sessionFlow().map { session ->
-            session?.let {
-                api.getAbsencesForPeriod(
-                    userId = "eq.${it.userId}",
-                    periodId = "eq.$periodId",
-                ).map { dto -> dto.toDomain() }
-            } ?: emptyList()
+            runCatching {
+                session?.let {
+                    api.getAbsencesForPeriod(
+                        userId = "eq.${it.userId}",
+                        periodId = "eq.$periodId",
+                    ).map { dto -> dto.toDomain() }
+                } ?: emptyList()
+            }.getOrDefault(emptyList())
         }
 
     override suspend fun saveApprovedAbsence(
@@ -62,46 +66,52 @@ class AbsenceRepositoryImpl @Inject constructor(
         if (endDate.isBefore(startDate)) {
             return SaveAbsenceResult.Error(SaveAbsenceError.END_BEFORE_START)
         }
-        val session = sessionDataStore.sessionFlow.first()
-            ?: return SaveAbsenceResult.Error(SaveAbsenceError.NO_ACTIVE_PERIOD)
-        val active = api.getActivePeriods(userId = "eq.${session.userId}")
-            .firstOrNull()
-            ?.toDomain()
-            ?: return SaveAbsenceResult.Error(SaveAbsenceError.NO_ACTIVE_PERIOD)
-        if (!active.contains(startDate) || !active.contains(endDate)) {
-            return SaveAbsenceResult.Error(SaveAbsenceError.OUTSIDE_ACTIVE_PERIOD)
+        return runCatching {
+            val session = sessionDataStore.sessionFlow.first()
+                ?: return SaveAbsenceResult.Error(SaveAbsenceError.NO_ACTIVE_PERIOD)
+            val active = api.getActivePeriods(userId = "eq.${session.userId}")
+                .firstOrNull()
+                ?.toDomain()
+                ?: return SaveAbsenceResult.Error(SaveAbsenceError.NO_ACTIVE_PERIOD)
+            if (!active.contains(startDate) || !active.contains(endDate)) {
+                return SaveAbsenceResult.Error(SaveAbsenceError.OUTSIDE_ACTIVE_PERIOD)
+            }
+            val overlapping = api.getAbsencesBetween(
+                userId = "eq.${session.userId}",
+                periodId = "eq.${active.id}",
+                startsBeforeEnd = "lte.$endDate",
+                endsAfterStart = "gte.$startDate",
+            ).map { it.toDomain() }.any {
+                it.status != AbsenceStatus.REJECTED && it.status != AbsenceStatus.CANCELLED
+            }
+            if (overlapping) {
+                return SaveAbsenceResult.Error(SaveAbsenceError.OVERLAPS_EXISTING_ABSENCE)
+            }
+            val absence = Absence(
+                periodId = active.id,
+                startDate = startDate,
+                endDate = endDate,
+                type = type,
+                reason = reason.trim(),
+                status = AbsenceStatus.APPROVED,
+            )
+            val saved = api.createAbsence(absence.toSupabaseInsert(session.userId)).first()
+            refreshEvents.emit(Unit)
+            SaveAbsenceResult.Success(saved.id)
+        }.getOrElse {
+            SaveAbsenceResult.Error(SaveAbsenceError.NETWORK)
         }
-        val overlapping = api.getAbsencesBetween(
-            userId = "eq.${session.userId}",
-            periodId = "eq.${active.id}",
-            startsBeforeEnd = "lte.$endDate",
-            endsAfterStart = "gte.$startDate",
-        ).map { it.toDomain() }.any {
-            it.status != AbsenceStatus.REJECTED && it.status != AbsenceStatus.CANCELLED
-        }
-        if (overlapping) {
-            return SaveAbsenceResult.Error(SaveAbsenceError.OVERLAPS_EXISTING_ABSENCE)
-        }
-        val absence = Absence(
-            periodId = active.id,
-            startDate = startDate,
-            endDate = endDate,
-            type = type,
-            reason = reason.trim(),
-            status = AbsenceStatus.APPROVED,
-        )
-        val saved = api.createAbsence(absence.toSupabaseInsert(session.userId)).first()
-        refreshEvents.emit(Unit)
-        return SaveAbsenceResult.Success(saved.id)
     }
 
     override suspend fun deleteAbsence(absenceId: Long) {
         val session = sessionDataStore.sessionFlow.first() ?: return
-        api.deleteAbsence(
-            id = "eq.$absenceId",
-            userId = "eq.${session.userId}",
-        )
-        refreshEvents.emit(Unit)
+        runCatching {
+            api.deleteAbsence(
+                id = "eq.$absenceId",
+                userId = "eq.${session.userId}",
+            )
+            refreshEvents.emit(Unit)
+        }
     }
 
     private fun sessionFlow() =
