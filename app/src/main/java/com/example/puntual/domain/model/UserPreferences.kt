@@ -5,6 +5,7 @@ data class UserPreferences(
     val hasExpectedTime: Boolean = false,
     val expectedHour: Int = 8,
     val expectedMinute: Int = 0,
+    val biometricUnlockEnabled: Boolean = true,
 )
 
 /** Solo el nombre de la persona; nunca incluye la marca «Puntual». */

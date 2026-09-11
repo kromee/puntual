@@ -220,6 +220,10 @@ class CheckInRepositoryImpl @Inject constructor(
         preferencesDataStore.clearExpectedTime()
     }
 
+    override suspend fun setBiometricUnlockEnabled(enabled: Boolean) {
+        preferencesDataStore.setBiometricUnlockEnabled(enabled)
+    }
+
     private fun sessionFlow(): Flow<AuthSession?> =
         combine(sessionDataStore.sessionFlow, refreshEvents) { session, _ -> session }
 

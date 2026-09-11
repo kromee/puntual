@@ -34,6 +34,7 @@ class UserPreferencesDataStore @Inject constructor(
             hasExpectedTime = hasExpectedTime,
             expectedHour = prefs[Keys.EXPECTED_HOUR] ?: DEFAULT_HOUR,
             expectedMinute = prefs[Keys.EXPECTED_MINUTE] ?: DEFAULT_MINUTE,
+            biometricUnlockEnabled = prefs[Keys.BIOMETRIC_UNLOCK_ENABLED] ?: true,
         )
     }
 
@@ -64,11 +65,18 @@ class UserPreferencesDataStore @Inject constructor(
         }
     }
 
+    suspend fun setBiometricUnlockEnabled(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[Keys.BIOMETRIC_UNLOCK_ENABLED] = enabled
+        }
+    }
+
     private object Keys {
         val DISPLAY_NAME = stringPreferencesKey("display_name")
         val EXPECTED_HOUR = intPreferencesKey("expected_hour")
         val EXPECTED_MINUTE = intPreferencesKey("expected_minute")
         val EXPECTED_TIME_SET = booleanPreferencesKey("expected_time_set")
+        val BIOMETRIC_UNLOCK_ENABLED = booleanPreferencesKey("biometric_unlock_enabled")
     }
 
     companion object {

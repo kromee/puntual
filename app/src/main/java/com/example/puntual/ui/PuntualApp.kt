@@ -48,8 +48,10 @@ import com.example.puntual.ui.theme.TextSecondary
 fun PuntualApp(
     activity: FragmentActivity,
     authViewModel: AuthViewModel = hiltViewModel(),
+    appSecurityViewModel: AppSecurityViewModel = hiltViewModel(),
 ) {
     val authState by authViewModel.uiState.collectAsStateWithLifecycle()
+    val securityState by appSecurityViewModel.uiState.collectAsStateWithLifecycle()
     var isLocallyUnlocked by remember { mutableStateOf(false) }
     var biometricError by remember { mutableStateOf<String?>(null) }
     val biometricManager = remember(activity) { BiometricManager.from(activity) }
@@ -103,13 +105,17 @@ fun PuntualApp(
         }
     }
 
-    LaunchedEffect(authState.isAuthenticated, canUseBiometrics, isLocallyUnlocked) {
-        if (authState.isAuthenticated && canUseBiometrics && !isLocallyUnlocked) {
+    val shouldRequireBiometricUnlock = authState.isAuthenticated &&
+        securityState.biometricUnlockEnabled &&
+        canUseBiometrics
+
+    LaunchedEffect(shouldRequireBiometricUnlock, isLocallyUnlocked) {
+        if (shouldRequireBiometricUnlock && !isLocallyUnlocked) {
             biometricPrompt.authenticate(promptInfo)
         }
     }
 
-    if (canUseBiometrics && !isLocallyUnlocked) {
+    if (shouldRequireBiometricUnlock && !isLocallyUnlocked) {
         BiometricUnlockScreen(
             errorMessage = biometricError,
             onUnlockClick = {

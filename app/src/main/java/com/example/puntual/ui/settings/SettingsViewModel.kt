@@ -77,6 +77,7 @@ data class SettingsUiState(
     val absenceError: String? = null,
     val isSavingAbsence: Boolean = false,
     val absenceSuccess: String? = null,
+    val biometricUnlockEnabled: Boolean = true,
 )
 
 sealed interface PermissionUiState {
@@ -139,6 +140,7 @@ class SettingsViewModel @Inject constructor(
                         } else {
                             ""
                         },
+                        biometricUnlockEnabled = prefs.biometricUnlockEnabled,
                     )
                 }
             }
@@ -177,6 +179,12 @@ class SettingsViewModel @Inject constructor(
     fun clearExpectedTime() {
         viewModelScope.launch {
             repository.clearExpectedTime()
+        }
+    }
+
+    fun onBiometricUnlockEnabledChange(enabled: Boolean) {
+        viewModelScope.launch {
+            repository.setBiometricUnlockEnabled(enabled)
         }
     }
 

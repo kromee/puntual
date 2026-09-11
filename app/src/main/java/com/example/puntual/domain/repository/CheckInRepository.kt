@@ -40,4 +40,5 @@ interface CheckInRepository {
     suspend fun setDisplayName(name: String)
     suspend fun setExpectedTime(hour: Int, minute: Int)
     suspend fun clearExpectedTime()
+    suspend fun setBiometricUnlockEnabled(enabled: Boolean)
 }
