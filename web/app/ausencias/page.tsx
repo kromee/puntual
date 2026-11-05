@@ -1,8 +1,6 @@
-import { connection } from "next/server";
-import { redirect } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 
-import { getSession } from "@/application/auth/get-session";
+import { getAuthenticatedShell } from "@/application/shell/get-authenticated-shell";
 import { formatWorkDate } from "@/application/attendance/format-entry";
 import { absenceStatusLabel, absenceTypeLabel } from "@/domain/attendance/absence";
 import { attendanceToday } from "@/domain/attendance/attendance-clock";
@@ -12,6 +10,7 @@ import { AppHeader } from "@/components/shell/app-header";
 import { createSupabaseAbsenceRepository } from "@/infrastructure/attendance/supabase-absence-repository";
 import { createSupabaseAuthRepository } from "@/infrastructure/auth/supabase-auth-repository";
 import { createSupabasePeriodRepository } from "@/infrastructure/attendance/supabase-period-repository";
+import { createSupabaseProfileRepository } from "@/infrastructure/profile/supabase-profile-repository";
 
 const ABSENCE_TYPE_OPTIONS = [
   { value: "VACATION", label: "Vacaciones" },
@@ -23,18 +22,17 @@ const ABSENCE_TYPE_OPTIONS = [
 
 export default function AbsencesPage() {
   return (
-    <Suspense fallback={<AbsencesShell email="Comprobando tu acceso." />}>
+    <Suspense fallback={<AbsencesShell subtitle="Comprobando tu acceso." />}>
       <AbsencesContent />
     </Suspense>
   );
 }
 
 async function AbsencesContent() {
-  await connection();
-  const session = await getSession(createSupabaseAuthRepository());
-  if (!session) {
-    redirect("/login");
-  }
+  const { subtitle } = await getAuthenticatedShell(
+    createSupabaseAuthRepository(),
+    createSupabaseProfileRepository(),
+  );
 
   const active = await createSupabasePeriodRepository().getActivePeriod();
   const today = attendanceToday();
@@ -43,7 +41,7 @@ async function AbsencesContent() {
     : [];
 
   return (
-    <AbsencesShell email={session.email}>
+    <AbsencesShell subtitle={subtitle}>
       <h1 className="text-xl font-semibold">Registrar ausencia</h1>
       {active ? (
         <>
@@ -87,10 +85,10 @@ async function AbsencesContent() {
   );
 }
 
-function AbsencesShell({ email, children }: { email: string; children?: ReactNode }) {
+function AbsencesShell({ subtitle, children }: { subtitle: string; children?: ReactNode }) {
   return (
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col px-4 py-8">
-      <AppHeader email={email} current="ausencias" />
+      <AppHeader subtitle={subtitle} current="ausencias" />
       <section className="mt-6 rounded-3xl bg-white px-6 py-8">{children}</section>
     </main>
   );

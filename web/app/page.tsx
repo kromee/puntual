@@ -1,40 +1,40 @@
-import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 
-import { getSession } from "@/application/auth/get-session";
 import { formatCheckInTime, formatDelay, formatWorkDate } from "@/application/attendance/format-entry";
+import { formatExpectedTime } from "@/application/profile/format-expected-time";
 import { getTodayEntry } from "@/application/attendance/get-today-entry";
+import { getAuthenticatedShell } from "@/application/shell/get-authenticated-shell";
 import { CorrectForm } from "@/components/check-in/correct-form";
 import { RegisterForm } from "@/components/check-in/register-form";
 import { AppHeader } from "@/components/shell/app-header";
 import { createSupabaseCheckInRepository } from "@/infrastructure/attendance/supabase-check-in-repository";
 import { createSupabaseAuthRepository } from "@/infrastructure/auth/supabase-auth-repository";
+import { createSupabaseProfileRepository } from "@/infrastructure/profile/supabase-profile-repository";
 
 export default function HomePage() {
   return (
-    <Suspense fallback={<EntryShell email="Comprobando tu acceso." />}>
+    <Suspense fallback={<EntryShell subtitle="Comprobando tu acceso." />}>
       <EntryHome />
     </Suspense>
   );
 }
 
 async function EntryHome() {
-  await connection();
-  const session = await getSession(createSupabaseAuthRepository());
-  if (!session) {
-    redirect("/login");
-  }
+  const { profile, subtitle } = await getAuthenticatedShell(
+    createSupabaseAuthRepository(),
+    createSupabaseProfileRepository(),
+  );
 
   const entry = await getTodayEntry(createSupabaseCheckInRepository());
   if (!entry) {
     redirect("/login");
   }
 
-  const status = entryStatus(entry);
+  const status = entryStatus(entry, profile.hasExpectedTime, profile);
 
   return (
-    <EntryShell email={session.email}>
+    <EntryShell subtitle={subtitle}>
       <p className="text-sm text-puntual-secondary">{entry.period.title}</p>
       <p className="mt-6 text-4xl text-puntual-muted">{formatWorkDate(entry.workDate)}</p>
       <p className="mt-2 text-sm text-puntual-secondary">{status.subtitle}</p>
@@ -53,25 +53,29 @@ async function EntryHome() {
 }
 
 function EntryShell({
-  email,
+  subtitle,
   children,
 }: {
-  email: string;
+  subtitle: string;
   children?: ReactNode;
 }) {
   return (
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col px-4 py-8">
-      <AppHeader email={email} current="entrada" />
+      <AppHeader subtitle={subtitle} current="entrada" />
       <section className="mt-6 flex flex-1 flex-col rounded-3xl bg-white px-6 py-8">{children}</section>
     </main>
   );
 }
 
-function entryStatus(entry: {
-  isWorkday: boolean;
-  outsidePeriod: boolean;
-  checkIn: { checkedInAt: string; delayMinutes: number } | null;
-}) {
+function entryStatus(
+  entry: {
+    isWorkday: boolean;
+    outsidePeriod: boolean;
+    checkIn: { checkedInAt: string; delayMinutes: number } | null;
+  },
+  hasExpectedTime: boolean,
+  profile: { expectedHour: number; expectedMinute: number },
+) {
   if (!entry.isWorkday) {
     return {
       subtitle: "Lunes a viernes",
@@ -85,14 +89,16 @@ function entryStatus(entry: {
     return {
       subtitle: "Bloque activo",
       title: "Hoy queda fuera del bloque",
-      detail: "Haz un corte cuando exista el módulo de periodos.",
+      detail: "Haz un corte en Periodos si necesitas ampliar el bloque.",
       detailClassName: "text-puntual-secondary",
       action: "none" as const,
     };
   }
   if (!entry.checkIn) {
     return {
-      subtitle: "Sin hora configurada · solo registro",
+      subtitle: hasExpectedTime
+        ? `Hora esperada · ${formatExpectedTime(profile.expectedHour, profile.expectedMinute)}`
+        : "Sin hora configurada · solo registro",
       title: "Presiona el botón al llegar",
       detail: null,
       detailClassName: "",

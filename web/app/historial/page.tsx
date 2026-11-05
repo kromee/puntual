@@ -1,14 +1,14 @@
-import { connection } from "next/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 
-import { getSession } from "@/application/auth/get-session";
+import { getAuthenticatedShell } from "@/application/shell/get-authenticated-shell";
 import { getHistory } from "@/application/history/get-history";
 import { attendanceToday } from "@/domain/attendance/attendance-clock";
 import { AppHeader } from "@/components/shell/app-header";
 import { createSupabaseAuthRepository } from "@/infrastructure/auth/supabase-auth-repository";
 import { createSupabaseHistoryRepository } from "@/infrastructure/attendance/supabase-history-repository";
+import { createSupabaseProfileRepository } from "@/infrastructure/profile/supabase-profile-repository";
 
 type HistorySearchParams = {
   period?: string | string[];
@@ -22,7 +22,7 @@ export default function HistoryPage({
   searchParams: Promise<HistorySearchParams>;
 }) {
   return (
-    <Suspense fallback={<HistoryShell email="Comprobando tu acceso." />}>
+    <Suspense fallback={<HistoryShell subtitle="Comprobando tu acceso." />}>
       <HistoryContent searchParams={searchParams} />
     </Suspense>
   );
@@ -33,11 +33,10 @@ async function HistoryContent({
 }: {
   searchParams: Promise<HistorySearchParams>;
 }) {
-  await connection();
-  const session = await getSession(createSupabaseAuthRepository());
-  if (!session) {
-    redirect("/login");
-  }
+  const { subtitle } = await getAuthenticatedShell(
+    createSupabaseAuthRepository(),
+    createSupabaseProfileRepository(),
+  );
 
   const params = await searchParams;
   const requested = {
@@ -64,7 +63,7 @@ async function HistoryContent({
   }
 
   return (
-    <HistoryShell email={session.email}>
+    <HistoryShell subtitle={subtitle}>
       <form action="/historial" className="flex flex-col gap-3">
         <label className="flex flex-col gap-1 text-sm font-medium text-puntual-text">
           Bloque
@@ -163,15 +162,15 @@ async function HistoryContent({
 }
 
 function HistoryShell({
-  email,
+  subtitle,
   children,
 }: {
-  email: string;
+  subtitle: string;
   children?: ReactNode;
 }) {
   return (
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col px-4 py-8">
-      <AppHeader email={email} current="historial" />
+      <AppHeader subtitle={subtitle} current="historial" />
       <section className="mt-6 rounded-3xl bg-white px-6 py-8">{children}</section>
     </main>
   );

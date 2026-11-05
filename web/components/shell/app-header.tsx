@@ -7,13 +7,14 @@ const links = [
   { href: "/historial", label: "Historial", id: "historial" },
   { href: "/periodos", label: "Periodos", id: "periodos" },
   { href: "/ausencias", label: "Ausencias", id: "ausencias" },
+  { href: "/perfil", label: "Perfil", id: "perfil" },
 ] as const;
 
 export function AppHeader({
-  email,
+  subtitle,
   current,
 }: {
-  email: string;
+  subtitle: string;
   current: (typeof links)[number]["id"];
 }) {
   return (
@@ -21,7 +22,7 @@ export function AppHeader({
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-3xl font-bold text-puntual-green">Puntual</p>
-          <p className="text-sm text-puntual-secondary">{email}</p>
+          <p className="text-sm text-puntual-secondary">{subtitle}</p>
         </div>
         <form action={signOutAction}>
           <button type="submit" className="text-sm font-semibold text-puntual-secondary">

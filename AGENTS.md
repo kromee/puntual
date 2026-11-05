@@ -44,7 +44,7 @@ Patrón: **MVVM** + repositorios + `Flow` reactivo desde DAOs.
 
 ## Web (`web/`)
 
-Cliente Next.js para registrar asistencia desde el iPhone y el navegador. Usa el mismo Supabase, esquema `puntuall`, y las mismas reglas de la app Android. La hora de un registro nuevo la asigna Postgres (`America/Mexico_City`). Hasta el módulo Perfil, un registro web sin hora esperada guarda retardo 0. Esta entrega no usa biometría. La migración `supabase/migrations/20261104190000_register_check_in.sql` debe aplicarse en Supabase antes de registrar desde la web.
+Cliente Next.js para registrar asistencia desde el iPhone y el navegador. Usa el mismo Supabase, esquema `puntuall`, y las mismas reglas de la app Android. La hora de un registro nuevo la asigna Postgres (`America/Mexico_City`). Sin hora esperada en Perfil, un registro web guarda retardo 0 y usa la hora local del servidor solo como evidencia. Con hora esperada configurada en `puntuall.user_profiles`, `register_check_in()` calcula retardo en la web. Esta entrega no usa biometría. Migraciones en Supabase: `20261104190000_register_check_in.sql` y `20261105121500_user_profiles.sql`.
 
 ### Stack
 
@@ -76,7 +76,7 @@ web/domain/           modelos, puertos y resultados
 web/infrastructure/   Supabase y mappers
 ```
 
-Módulos de la primera entrega: Acceso, Entrada (`/`), Historial (`/historial`), Periodos (`/periodos`), Ausencias (`/ausencias`) y Perfil.
+Módulos de la primera entrega: Acceso, Entrada (`/`), Historial (`/historial`), Periodos (`/periodos`), Ausencias (`/ausencias`) y Perfil (`/perfil`).
 
 ---
 

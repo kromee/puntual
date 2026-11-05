@@ -1,8 +1,7 @@
-import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 
-import { getSession } from "@/application/auth/get-session";
+import { getAuthenticatedShell } from "@/application/shell/get-authenticated-shell";
 import { formatWorkDate } from "@/application/attendance/format-entry";
 import { attendanceToday } from "@/domain/attendance/attendance-clock";
 import { suggestCloseDates } from "@/domain/attendance/close-period";
@@ -10,21 +9,21 @@ import { ClosePeriodForm } from "@/components/periods/close-period-form";
 import { AppHeader } from "@/components/shell/app-header";
 import { createSupabaseAuthRepository } from "@/infrastructure/auth/supabase-auth-repository";
 import { createSupabaseHistoryRepository } from "@/infrastructure/attendance/supabase-history-repository";
+import { createSupabaseProfileRepository } from "@/infrastructure/profile/supabase-profile-repository";
 
 export default function PeriodsPage() {
   return (
-    <Suspense fallback={<PeriodsShell email="Comprobando tu acceso." />}>
+    <Suspense fallback={<PeriodsShell subtitle="Comprobando tu acceso." />}>
       <PeriodsContent />
     </Suspense>
   );
 }
 
 async function PeriodsContent() {
-  await connection();
-  const session = await getSession(createSupabaseAuthRepository());
-  if (!session) {
-    redirect("/login");
-  }
+  const { subtitle } = await getAuthenticatedShell(
+    createSupabaseAuthRepository(),
+    createSupabaseProfileRepository(),
+  );
 
   const periods = await createSupabaseHistoryRepository().listPeriods();
   if (!periods) {
@@ -37,7 +36,7 @@ async function PeriodsContent() {
   const closed = periods.filter((period) => !period.isActive);
 
   return (
-    <PeriodsShell email={session.email}>
+    <PeriodsShell subtitle={subtitle}>
       <h1 className="text-xl font-semibold">Nuevo corte</h1>
       {active ? (
         <>
@@ -72,10 +71,10 @@ async function PeriodsContent() {
   );
 }
 
-function PeriodsShell({ email, children }: { email: string; children?: ReactNode }) {
+function PeriodsShell({ subtitle, children }: { subtitle: string; children?: ReactNode }) {
   return (
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col px-4 py-8">
-      <AppHeader email={email} current="periodos" />
+      <AppHeader subtitle={subtitle} current="periodos" />
       <section className="mt-6 rounded-3xl bg-white px-6 py-8">{children}</section>
     </main>
   );
