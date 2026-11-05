@@ -44,7 +44,7 @@ Patrón: **MVVM** + repositorios + `Flow` reactivo desde DAOs.
 
 ## Web (`web/`)
 
-Cliente Next.js para registrar asistencia desde el iPhone y el navegador. Usa el mismo Supabase y las mismas reglas de la app Android. La hora del registro la asigna el servidor. Esta entrega no usa biometría.
+Cliente Next.js para registrar asistencia desde el iPhone y el navegador. Usa el mismo Supabase, esquema `puntuall`, y las mismas reglas de la app Android. La hora de un registro nuevo la asigna Postgres (`America/Mexico_City`). Hasta el módulo Perfil, un registro web sin hora esperada guarda retardo 0. Esta entrega no usa biometría. La migración `supabase/migrations/20261104190000_register_check_in.sql` debe aplicarse en Supabase antes de registrar desde la web.
 
 ### Stack
 
@@ -181,5 +181,6 @@ Marca fija **「Puntual」**; el nombre de persona es solo el campo en Config (`
 4. Zen Quotes en Entrada como acción opcional (no automática al cerrar bloque)
 5. Eliminada UI de “días de vacaciones” / 8 horas
 6. Cliente web en `web/` con Next.js, misma lógica de Supabase y sin biometría
+7. La web registra la entrada con la hora de Postgres, en `America/Mexico_City`
 
 Actualizar este archivo cuando cambien reglas de negocio, versión de Room o APIs externas.

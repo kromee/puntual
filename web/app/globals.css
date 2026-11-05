@@ -7,6 +7,8 @@
   --puntual-secondary: #6b7280;
   --puntual-muted: #b0b8c4;
   --puntual-error: #ba1a1a;
+  --puntual-ontime: #2e7d32;
+  --puntual-late: #e65100;
 }
 
 @theme inline {
@@ -16,6 +18,8 @@
   --color-puntual-secondary: var(--puntual-secondary);
   --color-puntual-muted: var(--puntual-muted);
   --color-puntual-error: var(--puntual-error);
+  --color-puntual-ontime: var(--puntual-ontime);
+  --color-puntual-late: var(--puntual-late);
   --font-sans: var(--font-geist-sans);
 }
 
