@@ -42,6 +42,44 @@ Patrón: **MVVM** + repositorios + `Flow` reactivo desde DAOs.
 
 ---
 
+## Web (`web/`)
+
+Cliente Next.js para registrar asistencia desde el iPhone y el navegador. Usa el mismo Supabase y las mismas reglas de la app Android. La hora del registro la asigna el servidor. Esta entrega no usa biometría.
+
+### Stack
+
+| Componente | Nota |
+|------------|------|
+| Next.js | App Router, dentro de `web/` |
+| UI | React, TypeScript y Tailwind |
+| Acceso | Supabase Auth con sesión en cookie |
+| Despliegue | Vercel, con directorio raíz `web` |
+
+Variables locales en `web/.env.local` (no se versionan): `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. En Vercel se cargan como variables de entorno.
+
+### Patrones
+
+La dependencia apunta al dominio. Las pantallas no llaman a Supabase.
+
+- **Puerto y adaptador:** `domain/` define los contratos. `infrastructure/` los implementa.
+- **Repositorio:** el acceso a datos pasa por una interfaz.
+- **Caso de uso:** cada acción de negocio vive en `application/` y devuelve un resultado tipado.
+- **Mapper:** las filas de Supabase se traducen a modelos de dominio en el borde.
+- **Frontera de servidor:** las escrituras ocurren en Server Actions. El navegador no calcula la hora ni el retardo.
+- **Composición:** las rutas de `app/` componen casos de uso y componentes.
+
+```
+web/app/              rutas y acciones de entrada
+web/components/       interfaz
+web/application/      casos de uso
+web/domain/           modelos, puertos y resultados
+web/infrastructure/   Supabase y mappers
+```
+
+Módulos de la primera entrega: Acceso, Entrada, Historial, Periodos, Ausencias y Perfil.
+
+---
+
 ## Pantallas (bottom nav)
 
 1. **Entrada** (`ui/home/`) — registrar check-in lun–vie, corregir hora, **Ver frase**
@@ -142,5 +180,6 @@ Marca fija **「Puntual」**; el nombre de persona es solo el campo en Config (`
 3. Cortes de periodo para conteos independientes por tramo laboral
 4. Zen Quotes en Entrada como acción opcional (no automática al cerrar bloque)
 5. Eliminada UI de “días de vacaciones” / 8 horas
+6. Cliente web en `web/` con Next.js, misma lógica de Supabase y sin biometría
 
 Actualizar este archivo cuando cambien reglas de negocio, versión de Room o APIs externas.
