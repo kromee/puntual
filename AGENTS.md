@@ -76,7 +76,7 @@ web/domain/           modelos, puertos y resultados
 web/infrastructure/   Supabase y mappers
 ```
 
-Módulos de la primera entrega: Acceso, Entrada, Historial, Periodos, Ausencias y Perfil.
+Módulos de la primera entrega: Acceso, Entrada (`/`), Historial (`/historial`), Periodos, Ausencias y Perfil.
 
 ---
 

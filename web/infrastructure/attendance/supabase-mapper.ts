@@ -1,3 +1,4 @@
+import type { Absence } from "@/domain/attendance/absence";
 import type { AttendancePeriod } from "@/domain/attendance/attendance-period";
 import type { CheckIn } from "@/domain/attendance/check-in";
 
@@ -26,6 +27,28 @@ export function toPeriod(row: PeriodRow): AttendancePeriod {
     startDate: asDate(row.start_date),
     endDate: row.end_date ? asDate(row.end_date) : null,
     isActive: row.is_active,
+  };
+}
+
+export type AbsenceRow = {
+  id: number;
+  period_id: number;
+  start_date: string;
+  end_date: string;
+  type: string;
+  reason: string;
+  status: string;
+};
+
+export function toAbsence(row: AbsenceRow): Absence {
+  return {
+    id: row.id,
+    periodId: row.period_id,
+    startDate: asDate(row.start_date),
+    endDate: asDate(row.end_date),
+    type: row.type,
+    reason: row.reason,
+    status: row.status,
   };
 }
 

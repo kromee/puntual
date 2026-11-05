@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 
@@ -64,11 +65,16 @@ function EntryShell({
           <p className="text-3xl font-bold text-puntual-green">Puntual</p>
           <p className="text-sm text-puntual-secondary">{email}</p>
         </div>
-        <form action={signOutAction}>
-          <button type="submit" className="text-sm font-semibold text-puntual-green">
-            Salir
-          </button>
-        </form>
+        <div className="flex items-center gap-3">
+          <Link href="/historial" className="text-sm font-semibold text-puntual-green">
+            Historial
+          </Link>
+          <form action={signOutAction}>
+            <button type="submit" className="text-sm font-semibold text-puntual-secondary">
+              Salir
+            </button>
+          </form>
+        </div>
       </header>
       <section className="mt-6 flex flex-1 flex-col rounded-3xl bg-white px-6 py-8">{children}</section>
     </main>
