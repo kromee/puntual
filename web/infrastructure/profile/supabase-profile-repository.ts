@@ -29,6 +29,9 @@ async function getProfile(): Promise<UserProfile> {
     .maybeSingle();
 
   if (error) {
+    if (isMissingProfileTable(error)) {
+      return defaultUserProfile();
+    }
     throw error;
   }
   if (!data) {
@@ -55,9 +58,20 @@ async function saveProfile(profile: UserProfile): Promise<SaveProfileResult> {
   });
 
   if (error) {
+    if (isMissingProfileTable(error)) {
+      return { type: "missing-migration" };
+    }
     return { type: "network" };
   }
   return { type: "success" };
+}
+
+function isMissingProfileTable(error: { code?: string; message?: string }): boolean {
+  if (error.code === "PGRST205") {
+    return true;
+  }
+  const message = error.message ?? "";
+  return message.includes("user_profiles");
 }
 
 function toProfile(row: ProfileRow): UserProfile {

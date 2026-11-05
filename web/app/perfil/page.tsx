@@ -24,7 +24,9 @@ async function ProfileContent() {
     <ProfileShell subtitle={subtitle}>
       <h1 className="text-xl font-semibold">Perfil</h1>
       <p className="mt-2 text-sm text-puntual-secondary">
-        Nombre visible y hora esperada se guardan en Supabase para la web.
+        Nombre visible y hora esperada se guardan en Supabase para la web. Si aún no
+        ejecutaste el SQL, usa{" "}
+        <span className="font-medium">supabase/migrations/20261105121500_user_profiles.sql</span>.
       </p>
       <ProfileForm
         displayName={profile.displayName}
