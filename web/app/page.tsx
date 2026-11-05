@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Suspense, type ReactNode } from "react";
+import { Suspense } from "react";
 
 import { formatCheckInTime, formatDelay, formatWorkDate } from "@/application/attendance/format-entry";
 import { formatExpectedTime } from "@/application/profile/format-expected-time";
@@ -7,14 +7,14 @@ import { getTodayEntry } from "@/application/attendance/get-today-entry";
 import { getAuthenticatedShell } from "@/application/shell/get-authenticated-shell";
 import { CorrectForm } from "@/components/check-in/correct-form";
 import { RegisterForm } from "@/components/check-in/register-form";
-import { AppHeader } from "@/components/shell/app-header";
+import { AppShell } from "@/components/shell/app-shell";
 import { createSupabaseCheckInRepository } from "@/infrastructure/attendance/supabase-check-in-repository";
 import { createSupabaseAuthRepository } from "@/infrastructure/auth/supabase-auth-repository";
 import { createSupabaseProfileRepository } from "@/infrastructure/profile/supabase-profile-repository";
 
 export default function HomePage() {
   return (
-    <Suspense fallback={<EntryShell subtitle="Comprobando tu acceso." />}>
+    <Suspense fallback={<AppShell subtitle="Comprobando tu acceso." current="entrada" />}>
       <EntryHome />
     </Suspense>
   );
@@ -34,7 +34,7 @@ async function EntryHome() {
   const status = entryStatus(entry, profile.hasExpectedTime, profile);
 
   return (
-    <EntryShell subtitle={subtitle}>
+    <AppShell subtitle={subtitle} current="entrada">
       <p className="text-sm text-puntual-secondary">{entry.period.title}</p>
       <p className="mt-6 text-4xl text-puntual-muted">{formatWorkDate(entry.workDate)}</p>
       <p className="mt-2 text-sm text-puntual-secondary">{status.subtitle}</p>
@@ -48,22 +48,7 @@ async function EntryHome() {
       {status.action === "correct" && entry.checkIn ? (
         <CorrectForm defaultTime={formatCheckInTime(entry.checkIn.checkedInAt)} />
       ) : null}
-    </EntryShell>
-  );
-}
-
-function EntryShell({
-  subtitle,
-  children,
-}: {
-  subtitle: string;
-  children?: ReactNode;
-}) {
-  return (
-    <main className="mx-auto flex min-h-full w-full max-w-md flex-col px-4 py-8">
-      <AppHeader subtitle={subtitle} current="entrada" />
-      <section className="mt-6 flex flex-1 flex-col rounded-3xl bg-white px-6 py-8">{children}</section>
-    </main>
+    </AppShell>
   );
 }
 

@@ -1,4 +1,4 @@
-import { Suspense, type ReactNode } from "react";
+import { Suspense } from "react";
 
 import { getAuthenticatedShell } from "@/application/shell/get-authenticated-shell";
 import { formatWorkDate } from "@/application/attendance/format-entry";
@@ -6,7 +6,7 @@ import { absenceStatusLabel, absenceTypeLabel } from "@/domain/attendance/absenc
 import { attendanceToday } from "@/domain/attendance/attendance-clock";
 import { deleteAbsenceAction } from "@/app/ausencias/actions";
 import { AbsenceForm } from "@/components/absences/absence-form";
-import { AppHeader } from "@/components/shell/app-header";
+import { AppShell } from "@/components/shell/app-shell";
 import { createSupabaseAbsenceRepository } from "@/infrastructure/attendance/supabase-absence-repository";
 import { createSupabaseAuthRepository } from "@/infrastructure/auth/supabase-auth-repository";
 import { createSupabasePeriodRepository } from "@/infrastructure/attendance/supabase-period-repository";
@@ -22,7 +22,7 @@ const ABSENCE_TYPE_OPTIONS = [
 
 export default function AbsencesPage() {
   return (
-    <Suspense fallback={<AbsencesShell subtitle="Comprobando tu acceso." />}>
+    <Suspense fallback={<AppShell subtitle="Comprobando tu acceso." current="ausencias" />}>
       <AbsencesContent />
     </Suspense>
   );
@@ -41,7 +41,7 @@ async function AbsencesContent() {
     : [];
 
   return (
-    <AbsencesShell subtitle={subtitle}>
+    <AppShell subtitle={subtitle} current="ausencias">
       <h1 className="text-xl font-semibold">Registrar ausencia</h1>
       {active ? (
         <>
@@ -81,15 +81,6 @@ async function AbsencesContent() {
           </ul>
         </section>
       ) : null}
-    </AbsencesShell>
-  );
-}
-
-function AbsencesShell({ subtitle, children }: { subtitle: string; children?: ReactNode }) {
-  return (
-    <main className="mx-auto flex min-h-full w-full max-w-md flex-col px-4 py-8">
-      <AppHeader subtitle={subtitle} current="ausencias" />
-      <section className="mt-6 rounded-3xl bg-white px-6 py-8">{children}</section>
-    </main>
+    </AppShell>
   );
 }
