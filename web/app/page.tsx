@@ -1,13 +1,12 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 
 import { getSession } from "@/application/auth/get-session";
 import { formatCheckInTime, formatDelay, formatWorkDate } from "@/application/attendance/format-entry";
 import { getTodayEntry } from "@/application/attendance/get-today-entry";
-import { signOutAction } from "@/app/auth/actions";
 import { CorrectForm } from "@/components/check-in/correct-form";
 import { RegisterForm } from "@/components/check-in/register-form";
+import { AppHeader } from "@/components/shell/app-header";
 import { createSupabaseCheckInRepository } from "@/infrastructure/attendance/supabase-check-in-repository";
 import { createSupabaseAuthRepository } from "@/infrastructure/auth/supabase-auth-repository";
 
@@ -60,22 +59,7 @@ function EntryShell({
 }) {
   return (
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col px-4 py-8">
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-3xl font-bold text-puntual-green">Puntual</p>
-          <p className="text-sm text-puntual-secondary">{email}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link href="/historial" className="text-sm font-semibold text-puntual-green">
-            Historial
-          </Link>
-          <form action={signOutAction}>
-            <button type="submit" className="text-sm font-semibold text-puntual-secondary">
-              Salir
-            </button>
-          </form>
-        </div>
-      </header>
+      <AppHeader email={email} current="entrada" />
       <section className="mt-6 flex flex-1 flex-col rounded-3xl bg-white px-6 py-8">{children}</section>
     </main>
   );

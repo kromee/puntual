@@ -6,7 +6,7 @@ import { Suspense, type ReactNode } from "react";
 import { getSession } from "@/application/auth/get-session";
 import { getHistory } from "@/application/history/get-history";
 import { attendanceToday } from "@/domain/attendance/attendance-clock";
-import { signOutAction } from "@/app/auth/actions";
+import { AppHeader } from "@/components/shell/app-header";
 import { createSupabaseAuthRepository } from "@/infrastructure/auth/supabase-auth-repository";
 import { createSupabaseHistoryRepository } from "@/infrastructure/attendance/supabase-history-repository";
 
@@ -171,18 +171,7 @@ function HistoryShell({
 }) {
   return (
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col px-4 py-8">
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-3xl font-bold text-puntual-green">Puntual</p>
-          <p className="text-sm text-puntual-secondary">{email}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link href="/" className="text-sm font-semibold text-puntual-green">Entrada</Link>
-          <form action={signOutAction}>
-            <button type="submit" className="text-sm font-semibold text-puntual-secondary">Salir</button>
-          </form>
-        </div>
-      </header>
+      <AppHeader email={email} current="historial" />
       <section className="mt-6 rounded-3xl bg-white px-6 py-8">{children}</section>
     </main>
   );
