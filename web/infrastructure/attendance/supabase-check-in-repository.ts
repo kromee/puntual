@@ -1,3 +1,5 @@
+import { connection } from "next/server";
+
 import type { CheckInRepository } from "@/domain/attendance/check-in-repository";
 import {
   FIRST_PERIOD_START,
@@ -40,6 +42,7 @@ async function getTodayEntry(): Promise<TodayEntry | null> {
     return null;
   }
 
+  await connection();
   const workDate = attendanceToday();
   const period = await activePeriod(supabase, userId);
   const { data: checkInRow, error } = await supabase
