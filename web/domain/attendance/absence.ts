@@ -1,3 +1,17 @@
+export const ABSENCE_TYPES = [
+  "VACATION",
+  "PERSONAL_PERMISSION",
+  "SICK_LEAVE",
+  "HOLIDAY",
+  "FIELD_WORK",
+] as const;
+
+export type AbsenceType = (typeof ABSENCE_TYPES)[number];
+
+export function isAbsenceType(value: string): value is AbsenceType {
+  return (ABSENCE_TYPES as readonly string[]).includes(value);
+}
+
 export type Absence = {
   id: number;
   periodId: number;
