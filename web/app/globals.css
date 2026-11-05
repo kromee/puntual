@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+:root {
+  --puntual-green: #2eae6d;
+  --puntual-background: #f0f2f5;
+  --puntual-text: #1a1c1e;
+  --puntual-secondary: #6b7280;
+  --puntual-muted: #b0b8c4;
+  --puntual-error: #ba1a1a;
+  --puntual-ontime: #2e7d32;
+  --puntual-late: #e65100;
+}
+
+@theme inline {
+  --color-puntual-green: var(--puntual-green);
+  --color-puntual-background: var(--puntual-background);
+  --color-puntual-text: var(--puntual-text);
+  --color-puntual-secondary: var(--puntual-secondary);
+  --color-puntual-muted: var(--puntual-muted);
+  --color-puntual-error: var(--puntual-error);
+  --color-puntual-ontime: var(--puntual-ontime);
+  --color-puntual-late: var(--puntual-late);
+  --font-sans: var(--font-geist-sans);
+}
+
+body {
+  font-family: var(--font-geist-sans), sans-serif;
+}
