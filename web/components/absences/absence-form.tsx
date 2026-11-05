@@ -3,14 +3,19 @@
 import { useActionState } from "react";
 
 import { saveAbsenceAction, type SaveAbsenceFormState } from "@/app/ausencias/actions";
-import { ABSENCE_TYPES, absenceTypeLabel } from "@/domain/attendance/absence";
 
 const initialState: SaveAbsenceFormState = {
   errorMessage: null,
   successMessage: null,
 };
 
-export function AbsenceForm({ today }: { today: string }) {
+export function AbsenceForm({
+  today,
+  types,
+}: {
+  today: string;
+  types: { value: string; label: string }[];
+}) {
   const [state, formAction, pending] = useActionState(saveAbsenceAction, initialState);
 
   return (
@@ -45,8 +50,8 @@ export function AbsenceForm({ today }: { today: string }) {
           disabled={pending}
           className="h-12 rounded-xl border border-puntual-muted bg-white px-3"
         >
-          {ABSENCE_TYPES.map((type) => (
-            <option key={type} value={type}>{absenceTypeLabel(type)}</option>
+          {types.map((type) => (
+            <option key={type.value} value={type.value}>{type.label}</option>
           ))}
         </select>
       </label>

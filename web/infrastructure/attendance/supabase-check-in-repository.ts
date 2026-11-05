@@ -35,6 +35,7 @@ export function createSupabaseCheckInRepository(): CheckInRepository {
 }
 
 async function getTodayEntry(): Promise<TodayEntry | null> {
+  await connection();
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase.auth.getUser();
   const userId = data.user?.id;
@@ -42,7 +43,6 @@ async function getTodayEntry(): Promise<TodayEntry | null> {
     return null;
   }
 
-  await connection();
   const workDate = attendanceToday();
   const period = await activePeriod(supabase, userId);
   const { data: checkInRow, error } = await supabase

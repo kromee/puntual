@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 
@@ -19,6 +20,7 @@ export default function HomePage() {
 }
 
 async function EntryHome() {
+  await connection();
   const session = await getSession(createSupabaseAuthRepository());
   if (!session) {
     redirect("/login");

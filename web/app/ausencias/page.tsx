@@ -13,6 +13,14 @@ import { createSupabaseAbsenceRepository } from "@/infrastructure/attendance/sup
 import { createSupabaseAuthRepository } from "@/infrastructure/auth/supabase-auth-repository";
 import { createSupabasePeriodRepository } from "@/infrastructure/attendance/supabase-period-repository";
 
+const ABSENCE_TYPE_OPTIONS = [
+  { value: "VACATION", label: "Vacaciones" },
+  { value: "PERSONAL_PERMISSION", label: "Permiso" },
+  { value: "SICK_LEAVE", label: "Incapacidad" },
+  { value: "HOLIDAY", label: "Día festivo" },
+  { value: "FIELD_WORK", label: "Trabajo fuera de oficina" },
+];
+
 export default function AbsencesPage() {
   return (
     <Suspense fallback={<AbsencesShell email="Comprobando tu acceso." />}>
@@ -40,7 +48,10 @@ async function AbsencesContent() {
       {active ? (
         <>
           <p className="mt-2 text-sm text-puntual-secondary">Bloque activo: {active.title}</p>
-          <AbsenceForm today={today} />
+          <AbsenceForm
+            today={today}
+            types={ABSENCE_TYPE_OPTIONS}
+          />
         </>
       ) : (
         <p className="mt-3 text-sm text-puntual-secondary">
