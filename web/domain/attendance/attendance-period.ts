@@ -16,6 +16,18 @@ export function periodContains(period: AttendancePeriod, isoDate: string): boole
   return true;
 }
 
+export function periodContainsWorkDate(
+  period: AttendancePeriod,
+  isoDate: string,
+  today: string,
+): boolean {
+  if (isoDate < period.startDate) {
+    return false;
+  }
+  const lastDate = period.endDate ?? today;
+  return isoDate <= lastDate;
+}
+
 export function defaultOpenPeriodTitle(): string {
   return "1 ene 2025 – actualidad";
 }

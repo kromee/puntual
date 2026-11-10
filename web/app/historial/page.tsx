@@ -5,7 +5,9 @@ import { Suspense } from "react";
 import { getAuthenticatedShell } from "@/application/shell/get-authenticated-shell";
 import { getHistory } from "@/application/history/get-history";
 import { attendanceToday } from "@/domain/attendance/attendance-clock";
+import { isoDate, yearMonthOf } from "@/domain/attendance/period-date-rules";
 import { AppShell } from "@/components/shell/app-shell";
+import { ManualCheckInForm } from "@/components/history/manual-check-in-form";
 import { createSupabaseAuthRepository } from "@/infrastructure/auth/supabase-auth-repository";
 import { createSupabaseHistoryRepository } from "@/infrastructure/attendance/supabase-history-repository";
 import { createSupabaseProfileRepository } from "@/infrastructure/profile/supabase-profile-repository";
@@ -44,8 +46,9 @@ async function HistoryContent({
     year: numberParam(params.year),
     month: numberParam(params.month),
   };
+  const today = attendanceToday();
   const history = await getHistory(createSupabaseHistoryRepository(), {
-    today: attendanceToday(),
+    today,
     ...requested,
   });
 
@@ -61,6 +64,11 @@ async function HistoryContent({
   ) {
     redirect(canonical);
   }
+
+  const todayYm = yearMonthOf(today);
+  const defaultWorkDate = todayYm.year === history.year && todayYm.month === history.month
+    ? today
+    : isoDate(history.year, history.month, 1);
 
   return (
     <AppShell subtitle={subtitle} current="historial">
@@ -111,6 +119,14 @@ async function HistoryContent({
           </Link>
         ) : <span className="text-sm text-puntual-muted">Siguiente</span>}
       </div>
+
+      <section className="mt-6">
+        <h2 className="font-semibold">Registro manual</h2>
+        <p className="mt-1 text-sm text-puntual-secondary">
+          Si olvidaste registrar un día laborable, agrégalo en el bloque seleccionado.
+        </p>
+        <ManualCheckInForm periodId={history.periodId} defaultWorkDate={defaultWorkDate} />
+      </section>
 
       <section className="mt-6 rounded-2xl bg-puntual-background p-4">
         <h2 className="font-semibold">Resumen del mes</h2>
