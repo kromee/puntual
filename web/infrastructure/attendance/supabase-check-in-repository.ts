@@ -10,8 +10,10 @@ import {
   defaultOpenPeriodTitle,
   periodContains,
 } from "@/domain/attendance/attendance-period";
+import type { CheckIn } from "@/domain/attendance/check-in";
 import type { CorrectCheckInResult } from "@/domain/attendance/correct-check-in-result";
 import type { RegisterCheckInResult } from "@/domain/attendance/register-check-in-result";
+import type { RegisterManualCheckInResult } from "@/domain/attendance/register-manual-check-in-result";
 import type { TodayEntry } from "@/domain/attendance/today-entry";
 import {
   toCheckIn,
@@ -31,6 +33,8 @@ export function createSupabaseCheckInRepository(): CheckInRepository {
     getTodayEntry,
     registerCheckIn,
     correctCheckIn,
+    findCheckIn,
+    insertManualCheckIn,
   };
 }
 
@@ -91,6 +95,58 @@ async function correctCheckIn(input: {
     return error ? correctFailure(error) : { type: "network" };
   }
   return { type: "success", checkIn: toCheckIn(oneRow(data)) };
+}
+
+async function findCheckIn(periodId: number, workDate: string): Promise<CheckIn | null> {
+  await connection();
+  const context = await requireUser();
+  if (!context) {
+    return null;
+  }
+  const { data, error } = await context.supabase
+    .from("check_ins")
+    .select("id, period_id, work_date, checked_in_at, expected_hour, expected_minute, delay_minutes")
+    .eq("user_id", context.userId)
+    .eq("period_id", periodId)
+    .eq("work_date", workDate)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+  return data ? toCheckIn(data as CheckInRow) : null;
+}
+
+async function insertManualCheckIn(input: {
+  periodId: number;
+  workDate: string;
+  checkedInAt: string;
+  expectedHour: number;
+  expectedMinute: number;
+  delayMinutes: number;
+}): Promise<RegisterManualCheckInResult> {
+  const context = await requireUser();
+  if (!context) {
+    return { type: "network" };
+  }
+  const { error } = await context.supabase.from("check_ins").insert({
+    user_id: context.userId,
+    period_id: input.periodId,
+    work_date: input.workDate,
+    checked_in_at: input.checkedInAt,
+    expected_hour: input.expectedHour,
+    expected_minute: input.expectedMinute,
+    delay_minutes: input.delayMinutes,
+  });
+
+  if (error) {
+    if (error.code === "23505") {
+      return { type: "already-registered" };
+    }
+    return { type: "network" };
+  }
+  return { type: "success" };
 }
 
 async function activePeriod(
@@ -171,4 +227,13 @@ function oneRow(data: CheckInRow | CheckInRow[]): CheckInRow {
 
 function isMissingFunction(error: PostgrestError, message: string): boolean {
   return error.code === "PGRST202" || message.includes("Could not find the function");
+}
+
+async function requireUser() {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) {
+    return null;
+  }
+  return { supabase, userId: data.user.id };
 }
